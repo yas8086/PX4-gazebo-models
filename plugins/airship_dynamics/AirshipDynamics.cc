@@ -13,6 +13,7 @@
 #include <gz/sim/components/Gravity.hh>
 #include <gz/sim/components/Inertial.hh>
 #include <gz/sim/components/LinearVelocity.hh>
+#include <gz/sim/components/Name.hh>
 #include <gz/sim/components/Pose.hh>
 #include <gz/sim/components/World.hh>
 #include <gz/sim/components/Wind.hh>
@@ -86,6 +87,20 @@ public:
   double netBuoyancyCmd{0.0};
   bool netBuoyancyCmdValid{false};
 
+  // 四气囊空气质量 (kg) - 索引: 0=LI, 1=LO, 2=RI, 3=RO
+  // 由 PX4 ballast_control 积分估计并通过 ballast_actuator topic 发送
+  // 4气囊完全同步充放气, 总质量作为可变载荷影响垂直浮力
+  double ballastMass[4]{0.0, 0.0, 0.0, 0.0};
+
+  // 四气囊执行器状态 (0或1)
+  uint8_t blowerInState[4]{0, 0, 0, 0};
+  uint8_t blowerOutState[4]{0, 0, 0, 0};
+  uint8_t valveInState[4]{0, 0, 0, 0};
+  uint8_t valveOutState[4]{0, 0, 0, 0};
+
+  // 单气囊最大质量 (kg)
+  double ballastMassMax{128.5};
+
   void UpdateWind(const msgs::Vector3d &_msg)
   {
     std::lock_guard<std::mutex> lock(this->mtx);
@@ -95,9 +110,27 @@ public:
   void UpdateBallast(const msgs::Vector3d &_msg)
   {
     std::lock_guard<std::mutex> lock(this->mtx);
-    // x 分量 = net_buoyancy 调整量 (N)
+    // x = net_buoyancy 调整量 (N), y 已废弃
     this->netBuoyancyCmd = _msg.x();
     this->netBuoyancyCmdValid = true;
+  }
+
+  void UpdateBallastActuator(const msgs::Vector3d &_msg)
+  {
+    std::lock_guard<std::mutex> lock(this->mtx);
+    // x = 气囊索引 (0=LI, 1=LO, 2=RI, 3=RO)
+    // y = 执行器状态位图: bit0=blower_in, bit1=blower_out, bit2=valve_in, bit3=valve_out
+    // z = 当前空气质量 (kg)
+    int idx = static_cast<int>(_msg.x());
+    if (idx < 0 || idx > 3) return;
+
+    uint8_t state = static_cast<uint8_t>(_msg.y());
+    blowerInState[idx]  = state & 0x01;
+    blowerOutState[idx] = (state >> 1) & 0x01;
+    valveInState[idx]   = (state >> 2) & 0x01;
+    valveOutState[idx]  = (state >> 3) & 0x01;
+
+    ballastMass[idx] = _msg.z();
   }
 };
 
@@ -242,17 +275,44 @@ void AirshipDynamics::Configure(
   if (!_ecm.Component<components::WorldLinearVelocity>(this->dataPtr->linkEntity))
     _ecm.CreateComponent(this->dataPtr->linkEntity, components::WorldLinearVelocity());
 
-  this->dataPtr->node.Subscribe("/world/default/wind",
+  // 动态获取 world 名字, 构建 wind topic (避免硬编码)
+  // 默认 world 名字为 "default", 飞艇仿真使用 "airship_world" 等
+  std::string worldName = "default";
+  Entity worldEntity = _ecm.EntityByComponents(components::World());
+
+  if (worldEntity != kNullEntity) {
+    auto nameComp = _ecm.Component<components::Name>(worldEntity);
+
+    if (nameComp) {
+      worldName = nameComp->Data();
+    }
+  }
+
+  std::string windTopic = "/world/" + worldName + "/wind";
+  this->dataPtr->node.Subscribe(windTopic,
       &Impl::UpdateWind, this->dataPtr.get());
+  gzmsg << "[AirshipDynamics] Subscribed to wind topic: " << windTopic << std::endl;
 
   // 订阅 ballast_control 发布的动态浮力命令
   // topic 格式: /model/{model_name}/ballast_cmd
-  // 消息类型: gz::msgs::Vector3d (x=net_buoyancy N)
+  // 消息类型: gz::msgs::Vector3d (x=net_buoyancy N, y 已废弃)
   std::string modelName = model.Name(_ecm);
   std::string ballastTopic = "/model/" + modelName + "/ballast_cmd";
   this->dataPtr->node.Subscribe(ballastTopic,
       &Impl::UpdateBallast, this->dataPtr.get());
   gzmsg << "[AirshipDynamics] Subscribed to ballast topic: " << ballastTopic << std::endl;
+
+  // 订阅 ballast_control 发布的四气囊执行器状态
+  // topic 格式: /model/{model_name}/ballast_actuator
+  // 消息类型: gz::msgs::Vector3d (x=气囊索引, y=执行器状态位图, z=空气质量kg)
+  std::string ballastActuatorTopic = "/model/" + modelName + "/ballast_actuator";
+  this->dataPtr->node.Subscribe(ballastActuatorTopic,
+      &Impl::UpdateBallastActuator, this->dataPtr.get());
+  gzmsg << "[AirshipDynamics] Subscribed to ballast_actuator topic: " << ballastActuatorTopic << std::endl;
+
+  // 四气囊参数 (可从SDF覆盖默认值)
+  if (_sdf->HasElement("ballast_mass_max"))
+    this->dataPtr->ballastMassMax = _sdf->Get<double>("ballast_mass_max");
 
   auto gravityComp = _ecm.Component<components::Gravity>(
       _ecm.EntityByComponents(components::World()));
@@ -326,6 +386,7 @@ void AirshipDynamics::Configure(
   gzmsg << "  rot_damping_y: " << this->dataPtr->rotDampingY << " N·m·s/rad" << std::endl;
   gzmsg << "  rot_damping_z: " << this->dataPtr->rotDampingZ << " N·m·s/rad" << std::endl;
   gzmsg << "  dist_cov: " << this->dataPtr->distCOV << std::endl;
+  gzmsg << "  ballast_mass_max: " << this->dataPtr->ballastMassMax << " kg" << std::endl;
   gzmsg << "  tether_enabled: " << (this->dataPtr->tetherEnabled ? "true" : "false")
         << std::endl;
   if (this->dataPtr->tetherEnabled)
@@ -393,6 +454,22 @@ void AirshipDynamics::PreUpdate(
   math::Vector3d buoyancyWorld = -this->dataPtr->airDensity *
                                   currentEffectiveVolume * gravity;
   math::Vector3d buoyancyBody = pose->Rot().RotateVectorReverse(buoyancyWorld);
+
+  // === 1.5 Four-Ballast Mass Weight (四气囊统一浮力调节) ===
+  // 4气囊完全同步充放气, 总空气质量作为可变载荷
+  // 充气(增重) -> 下沉; 放气(减重) -> 上升
+  // 气囊重量方向向下(world: +gravity), 与浮力(向上)相反
+  // 叠加到 buoyancyBody, 等效减小有效浮力
+  double totalBallastMass = 0.0;
+  {
+    std::lock_guard<std::mutex> lock(this->dataPtr->mtx);
+    for (int i = 0; i < 4; i++) {
+      totalBallastMass += this->dataPtr->ballastMass[i];
+    }
+  }
+  math::Vector3d ballastWeightWorld = totalBallastMass * gravity;  // 向下
+  math::Vector3d ballastWeightBody = pose->Rot().RotateVectorReverse(ballastWeightWorld);
+  buoyancyBody += ballastWeightBody;
 
   // === 2. Added Mass Forces and Moments ===
   // Using Kirchhoff equations
@@ -468,6 +545,10 @@ void AirshipDynamics::PreUpdate(
       -this->dataPtr->rotDampingY * angVel.Y(),
       -this->dataPtr->rotDampingZ * angVel.Z());
 
+  // === 6.5 Roll Moment (已移除) ===
+  // 新方案: 四气囊取消横滚调节, 全部同步充放气用于调节高度
+  // 横滚不通过气囊控制 (见 AirshipDynamics 上方 1.5 节: 气囊总质量 -> 垂直浮力)
+
   // === 7. Total Forces and Moments ===
   // 策略:
   //   - 浮力在浮力中心(buoyancyCenter)施加, 产生恢复力矩(摆锤效应)
@@ -494,7 +575,8 @@ void AirshipDynamics::PreUpdate(
 
   // 总力和总力矩
   math::Vector3d totalForceBody = buoyancyBody + nonBuoyancyForce;
-  math::Vector3d totalMomentBody = nonBuoyancyMoment + buoyancyCompensatingMoment + nonBuoyancyCompensatingMoment;
+  math::Vector3d totalMomentBody = nonBuoyancyMoment + buoyancyCompensatingMoment
+                                   + nonBuoyancyCompensatingMoment;
 
   baseLink.AddWorldWrench(_ecm,
       pose->Rot() * totalForceBody,

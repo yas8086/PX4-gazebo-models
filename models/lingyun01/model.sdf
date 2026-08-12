@@ -836,6 +836,8 @@
       <rot_damping_y>220000</rot_damping_y>
       <!-- Z轴(Yaw): L=18.5m, C_l_rot=0.15, 基础值46378, 四气囊修正×3.0=140000 -->
       <rot_damping_z>140000</rot_damping_z>
+      <!-- 四气囊参数 (统一浮力调节) -->
+      <ballast_mass_max>128.5</ballast_mass_max>
     </plugin>
 
     <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
