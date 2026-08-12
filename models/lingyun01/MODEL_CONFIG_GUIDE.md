@@ -966,6 +966,141 @@ Y(左)
 
 ---
 
+## 🎈 统一浮力调节系统 (四气囊同步充放气)
+
+### 架构变更说明
+
+灵云01飞艇已**取消四气囊横滚控制**。4个空气囊不再做左右差动横滚调节,而是**完全同步充放气**,用于调节飞艇高度:
+- 充气 = 4气囊同步增重 = 下沉
+- 放气 = 4气囊同步减重 = 上升
+
+横滚控制相关的 BALLOON_R_* / TRIM_BALLOON_* 参数、ballast_setpoint 的 roll_moment_demand 字段均已删除。
+
+### 原理
+
+四气囊总空气质量作为可变载荷影响垂直浮力,从而调节高度:
+
+```
+F_net = buoyancy - (m_base + m_ballast_total) × g
+```
+
+- 浮力(向上)固定, 由氦气囊体积决定
+- 4气囊总质量 m_ballast_total 增大 → 净浮力减小 → 下沉
+- 4气囊总质量 m_ballast_total 减小 → 净浮力增大 → 上升
+
+### 四气囊布局
+
+| 索引 | 名称 | Y坐标(m) | 相对重心Y(m) | 位置 |
+|------|------|---------|-------------|------|
+| 0 | LI (左内) | -0.5815 | +2.3125 | 左侧内侧 |
+| 1 | LO (左外) | +4.0435 | +6.9375 | 左侧外侧 |
+| 2 | RI (右内) | -5.2065 | -2.3125 | 右侧内侧 |
+| 3 | RO (右外) | -9.8315 | -6.9375 | 右侧外侧 |
+
+**重心Y坐标**: -2.894m (inertial pose)
+
+> 注: 四气囊不再按左右差动分配质量,而是完全同步充放气(共用同一质量)。上表仅为物理安装位置参考。
+
+### 空气囊参数
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| 单囊体积 | 100 m³ | 空气囊体积 |
+| 最大表压 | 5 kPa | 结构极限 |
+| 最大空气质量 | 128.5 kg | 5kPa表压下 |
+| 风机流量 | 0.102 kg/s | 充气/抽气同款 |
+| 执行器 | 4囊同步 | 每囊2风机+2阀门, 同步驱动 |
+
+### 数据流架构
+
+ballast_control 订阅 airship_altitude_setpoint 目标高度,经统一浮力PID驱动四气囊同步充放气:
+
+```
+airship_att_control (发布目标高度)
+    │
+    │  airship_altitude_setpoint (uORB)
+    │
+    ▼
+ballast_control (统一浮力PID: 高度误差 -> 净浮力需求 -> 充放气命令)
+    │
+    │  ballast_setpoint (uORB, 唯一发布者)
+    │  包含: net_buoyancy, ballast_mass[4], 四气囊同步执行器命令
+    │
+    ▼
+GZMixingInterfaceBallast (gz_bridge)
+    │
+    │  /model/lingyun01/ballast_cmd      (x=net_buoyancy, y 已废弃)
+    │  /model/lingyun01/ballast_actuator (x=索引, y=状态位图, z=质量)
+    │
+    ▼
+AirshipDynamics (Gazebo插件)
+    │
+    │  四气囊总质量作为可变载荷: buoyancy += total_ballast_mass × gravity (向下)
+    │  (已删除横滚力矩计算)
+    │
+    ▼
+Gazebo物理引擎 (应用垂直力到base_link)
+```
+
+### 执行器状态位图
+
+每个空气囊的执行器状态编码为4位位图,4囊完全同步动作:
+
+| Bit | 执行器 | 功能 |
+|-----|--------|------|
+| 0 | blower_in | 充气风机 (增重) |
+| 1 | blower_out | 抽气风机 (减重) |
+| 2 | valve_in | 充气阀门 (配合充气风机) |
+| 3 | valve_out | 放气阀门 (配合抽气风机) |
+
+**互锁保护**: 充气阀和放气阀禁止同时打开 (代码实现)
+**同步策略**: 4个气囊执行同一套充放气命令(完全相同), 不做左右差动
+
+### AirshipDynamics 插件 SDF 参数
+
+AirshipDynamics 插件支持以下浮力调节相关 SDF 参数 (可在 model.sdf 中配置):
+
+| SDF元素 | 默认值 | 说明 |
+|---------|--------|------|
+| `net_buoyancy` | 0 | 额外浮力微调 (N) |
+| `ballast_mass_max` | 128.5 | 单气囊最大质量 (kg) |
+
+> 注: 旧横滚参数 roll_control_enabled / arm_inner / arm_outer 已随横滚控制移除。
+
+### PX4 参数配置
+
+**ballast_control 模块 (BALLOON_前缀, 统一浮力PID)**:
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| BALLOON_AST_EN | 1 | 启用浮力控制 |
+| BALLOON_DEADZONE | 0.5 | 高度死区 (m) |
+| BALLOON_THRSHLD | 2.0 | 鼓风机/阀门切换阈值 (m) |
+| BALLOON_P_GAIN | 0.8 | 高度PID比例增益 |
+| BALLOON_I_GAIN | 0.05 | 高度PID积分增益 |
+| BALLOON_D_GAIN | 0.2 | 高度PID微分增益 |
+| BALLOON_I_MAX | 50.0 | 高度PID积分限幅 |
+| BALLOON_RATE_MAX | 20.0 | 浮力调节最大速率 |
+| BALLOON_M_MAX | 128.5 | 单气囊最大空气质量 (kg) |
+| BLWR_FLOW | 0.102 | 风机空气质量流量 (kg/s) |
+| BLOWER_TAU | 10.0 | 鼓风机时间常数 (s) |
+| VALVE_OPEN_DELAY | 0.5 | 阀门开启延迟 (s) |
+
+> 注: 横滚控制参数(BALLOON_R_*)与配平参数(TRIM_BALLOON_*)已删除。
+
+### 质量分配策略
+
+四气囊**完全同步**充放气,不做左右差动分配:
+
+```
+充气(下沉): Δm_LI = Δm_LO = Δm_RI = Δm_RO = +Δm   (4囊同步增重)
+放气(上升): Δm_LI = Δm_LO = Δm_RI = Δm_RO = -Δm   (4囊同步减重)
+```
+
+4囊总质量变化 = 4 × Δm, 作为垂直浮力调节的可变载荷。
+
+---
+
 ## 🔗 相关文档
 
 - [灵云01主体STL分析报告](./meshes/source_backup/原始STL备份.md)
@@ -976,6 +1111,30 @@ Y(左)
 **维护者**: 灵云01项目组
 
 **版本历史**:
+- v2.3 (2026-08-12):
+  - **重大架构变更: 取消四气囊横滚控制, 改为统一浮力调节**
+  - 四气囊不再做左右差动横滚调节, 改为完全同步充放气用于调节高度
+  - 充气=4囊同步增重=下沉; 放气=4囊同步减重=上升
+  - 删除横滚力矩计算公式与 roll_disturbance_cmd 测试接口描述
+  - 数据流变更: airship_att_control 发布目标高度(airship_altitude_setpoint) -> ballast_control 统一浮力PID -> 四气囊同步充放气
+  - AirshipDynamics 插件删除横滚力矩计算, 改为四气囊总质量影响垂直浮力
+  - 删除横滚相关参数 (BALLOON_R_*, TRIM_BALLOON_*, AS_ROLL_*, roll_control_enabled, arm_inner, arm_outer)
+  - 执行器状态位图更新为四气囊同步充放气描述
+- v2.2 (2026-07-14):
+  - 横滚控制数据流架构变更: ballast_control 独立级联PID, 不再订阅 att_control 的 roll_moment_demand
+  - att_control 删除 publishBallastSetpoint, torque_x 置0 (横滚不通过电机控制)
+  - 修复自订阅回环问题: 两个模块同时发布 ballast_setpoint 导致 _roll_moment_demand 不稳定
+  - 数据流变更: vehicle_attitude/angular_velocity -> ballast_control(独立PID) -> gz_bridge -> AirshipDynamics
+  - 仿真测试验证: 200N*m 扰动下横滚角从6.7度修正到1.1度, rolDmd 非零(-0.040~-0.020)
+- v2.1 (2026-07-13):
+  - 新增"横滚控制系统 (四气囊空气囊)"章节
+  - 描述四气囊空气质量差产生横滚力矩的原理
+  - 四气囊布局和力臂参数表
+  - 数据流架构: att_control → ballast_control → gz_bridge → AirshipDynamics
+  - 执行器状态位图编码说明
+  - AirshipDynamics 插件 SDF 参数 (roll_control_enabled, arm_inner, arm_outer, ballast_mass_max)
+  - PX4 参数配置 (AS_ROLL_*, BALLOON_R_*, BLWR_FLOW, VALVE_HYST, VALVE_MIN_T)
+  - 质量分配策略 (外囊70%, 内囊30%, 反对称分配)
 - v2.0 (2026-06-25):
   - **重大更新：移除 tilt 舵机，改为无舵机新方案**
   - 升力电机从双Link结构（tilt_motor支架 + rotor螺旋桨）改为单Link结构（仅rotor螺旋桨）
