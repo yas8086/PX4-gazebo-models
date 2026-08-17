@@ -5,7 +5,7 @@
     <pose>0 0 0 0 0 0</pose>
 
     <!-- ============================================================ -->
-    <!-- 灵云01号 (Lingyun01) - Gazebo Sim 仿真模型                   -->
+    <!-- 灵云01号 (Lingyun01) V2 - Gazebo Sim 仿真模型               -->
     <!--                                                              -->
     <!-- 总体规格:                                                     -->
     <!--   起飞重量(仿真值): 2206 kg                                   -->
@@ -13,18 +13,24 @@
     <!--   氦气体积:     1800 m³                                      -->
     <!--   总长(含尾椎): 34.7 m                                        -->
     <!--   总宽:         18.5 m (四气囊组合)                           -->
-    <!--   总高:         12.8 m (四气囊垂直堆叠)                       -->
+    <!--   总高:         12.8 m                                       -->
+    <!--   重心(暂定): 艇身包围盒中心下方1.5m                          -->
+    <!--     base_link原点 = 艇身包围盒中心 (FLU)                      -->
+    <!--     重心 = (0, 0, -1.5) FLU (X前, Y左, Z上)                  -->
     <!--                                                              -->
-    <!-- 动力系统 (8电机):                                          -->
-    <!--   升力电机x4: 垂直推力 (M0/M3向上, M1/M2向下)              -->
-    <!--   推进电机x4: 水平推进+差动偏航 (两侧安装)                  -->
-    <!--                                                            -->
-    <!-- 升力电机新方案 (无舵机):                                    -->
-    <!--   M0(前1)/M3(后2): 推力向上, 用于上升, 额定20kg            -->
-    <!--   M1(前2)/M2(后1): 推力向下, 用于下降, 额定40kg            -->
-    <!--                                                            -->
-    <!-- 3D模型: 9个独立STL文件 (公司SolidWorks导出)                -->
-    <!-- 坐标系: PX4 FLU标准 (前-左-上, 右手定则)                   -->
+    <!-- 动力系统 (10电机):                                            -->
+    <!--   上升电机x4 (rotor_0~3): 推力向上, 四角布局                  -->
+    <!--   下降电机x2 (rotor_4~5): 推力向下, 中轴前后                  -->
+    <!--   推进电机x4 (rotor_6~9): 水平推进+差动偏航                   -->
+    <!--                                                              -->
+    <!-- 执行器: 4风机 + 4阀门 (每囊1风机1阀门)                        -->
+    <!--   充气 = 风机+阀门 (鼓风), 排气 = 仅阀门 (自然排气)           -->
+    <!--                                                              -->
+    <!-- 坐标系: PX4 FLU标准 (前-左-上, 右手定则)                     -->
+    <!--   V2 STL由SW坐标系(毫米)预转换 (见 meshes/convert_stl_to_flu.py): -->
+    <!--     FLU_X = SW_Y/1000, FLU_Y = -SW_X/1000, FLU_Z = SW_Z/1000  -->
+    <!--     再平移到相对主体中心 (主体中心在原点)                     -->
+    <!--   转换后STL位于 meshes/V2_FLU/ (米, FLU, 相对主体中心)       -->
     <!-- ============================================================ -->
 
     <static>false</static>
@@ -32,13 +38,14 @@
 
     <!-- ==================== -->
     <!-- 飞艇主体Link -->
-    <!-- 原点设在SolidWorks装配坐标系原点 (FLU: X=前, Y=左, Z=上) -->
+    <!-- 原点 = 艇身包围盒中心 (FLU: X=前, Y=左, Z=上) -->
+    <!-- 重心 = (0, 0, -1.5) FLU -->
     <!-- ==================== -->
     <link name='base_link'>
       <pose>0 0 0 0 0 0</pose>
 
       <inertial>
-        <pose>-0.012 -2.894 -0.009 0 0 0</pose>
+        <pose>0 0 -1.5 0 0 0</pose>
         <mass>2206</mass>
         <inertia>
           <ixx>44700.0</ixx>
@@ -53,19 +60,19 @@
       <gravity>true</gravity>
       <velocity_decay/>
 
-      <!-- ====== 四气囊主体外观 (lingyun01_hull_all.STL) ====== -->
+      <!-- ====== 四囊主体外观 (hull_all.STL, 中心在原点) ====== -->
       <visual name='hull_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_hull_all.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/hull_all.STL</uri>
           </mesh>
         </geometry>
         <material>
-          <ambient>0.93 0.93 0.95 0.92</ambient>
-          <diffuse>0.88 0.88 0.92 0.88</diffuse>
-          <specular>0.95 0.95 0.98 0.9</specular>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>0.3 0.3 0.3 0.9</specular>
           <emissive>0.0 0.0 0.0 1</emissive>
         </material>
       </visual>
@@ -75,7 +82,7 @@
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
-            <uri>model://lingyun01/meshes/lingyun01_hull_all.STL</uri>
+            <uri>model://lingyun01/meshes/V2_FLU/hull_all.STL</uri>
           </mesh>
         </geometry>
         <surface>
@@ -91,36 +98,19 @@
         </surface>
       </collision>
 
-      <!-- ====== 坐标系轴可视化 (调试用) ======
-      <visual name='axis_x'>
-        <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.03</radius><length>3</length></cylinder></geometry>
-        <material><ambient>1.0 0.0 0.0 1</ambient><diffuse>1.0 0.0 0.0 1</diffuse></material>
-      </visual>
-      <visual name='axis_y'>
-        <pose>0 1.5 0 -1.5708 0 0</pose>
-        <geometry><cylinder><radius>0.02</radius><length>3</length></cylinder></geometry>
-        <material><ambient>0.0 1.0 0.0 1</ambient><diffuse>0.0 1.0 0.0 1</diffuse></material>
-      </visual>
-      <visual name='axis_z'>
-        <pose>0 0 1.5 1.5708 0 0</pose>
-        <geometry><cylinder><radius>0.04</radius><length>3</length></cylinder></geometry>
-        <material><ambient>0.0 0.2 1.0 1</ambient><diffuse>0.0 0.2 1.0 1</diffuse></material>
-      </visual> -->
-
       <!-- ====== 重心可视化 (红色球体) ====== -->
       <visual name='com_visual'>
-        <pose>-0.012 -2.894 -0.009 0 0 0</pose>
+        <pose>0 0 -1.5 0 0 0</pose>
         <geometry><sphere><radius>0.5</radius></sphere></geometry>
         <material><ambient>1.0 0.0 0.0 1</ambient><diffuse>1.0 0.0 0.0 1</diffuse></material>
         <transparency>0.7</transparency>
       </visual>
 
-      <!-- IMU 传感器 (安装在base_link原点, 与PX4 EKF2假设一致) -->
+      <!-- IMU 传感器 (安装在重心, 与PX4 EKF2假设一致) -->
       <sensor name="imu_sensor" type="imu">
         <always_on>1</always_on>
         <update_rate>250</update_rate>
-        <pose>0 0 0 0 0 0</pose>
+        <pose>0 0 -1.5 0 0 0</pose>
         <imu>
           <angular_velocity>
             <x><noise type="gaussian"><mean>0.0</mean><stddev>0.0008726646</stddev></noise></x>
@@ -135,11 +125,11 @@
         </imu>
       </sensor>
 
-      <!-- 磁力计传感器 (安装在base_link原点, 与PX4 EKF2假设一致) -->
+      <!-- 磁力计传感器 (安装在重心) -->
       <sensor name="magnetometer_sensor" type="magnetometer">
         <always_on>1</always_on>
         <update_rate>100</update_rate>
-        <pose>0 0 0 0 0 0</pose>
+        <pose>0 0 -1.5 0 0 0</pose>
         <magnetometer>
           <x><noise type="gaussian"><stddev>0.0001</stddev></noise></x>
           <y><noise type="gaussian"><stddev>0.0001</stddev></noise></y>
@@ -147,51 +137,36 @@
         </magnetometer>
       </sensor>
 
-      <!-- 气压计传感器 (安装在base_link原点) -->
+      <!-- 气压计传感器 (安装在重心) -->
       <sensor name="air_pressure_sensor" type="air_pressure">
         <always_on>1</always_on>
         <update_rate>50</update_rate>
-        <pose>0 0 0 0 0 0</pose>
+        <pose>0 0 -1.5 0 0 0</pose>
         <air_pressure>
           <pressure><noise type="gaussian"><mean>0</mean><stddev>3</stddev></noise></pressure>
         </air_pressure>
       </sensor>
 
-      <!-- GPS 传感器 (安装在base_link原点) -->
+      <!-- GPS 传感器 (安装在重心) -->
       <sensor name="navsat_sensor" type="navsat">
         <always_on>1</always_on>
         <update_rate>30</update_rate>
-        <pose>0 0 0 0 0 0</pose>
+        <pose>0 0 -1.5 0 0 0</pose>
       </sensor>
     </link>
 
     <!-- ================================================================ -->
-    <!-- 升力电机 (输出0-3) - 新方案 (无舵机)                              -->
-    <!-- 结构: base_link -> rotor_joint(Z轴旋转) -> rotor link (螺旋桨)    -->
-    <!--                                                                  -->
-    <!-- 推力方向通过rotor_joint的旋转轴方向控制:                         -->
-    <!--   axis=+Z (0 0 1): 推力向上 (上升电机)                          -->
-    <!--   axis=-Z (0 0 -1): 推力向下 (下降电机)                          -->
-    <!--                                                                  -->
-    <!-- 升力电机配置:                                                    -->
-    <!--   M0(前1): 推力向上, 用于上升, 额定20kg, motorConstant=1.416e-03 -->
-    <!--   M1(前2): 推力向下, 用于下降, 额定40kg, motorConstant=-2.832e-03 -->
-    <!--   M2(后1): 推力向下, 用于下降, 额定40kg, motorConstant=-2.832e-03 -->
-    <!--   M3(后2): 推力向上, 用于上升, 额定20kg, motorConstant=1.416e-03 -->
-    <!--                                                                  -->
-    <!-- 编号规则: 前部=0/1, 后部=2/3                                     -->
-    <!-- STL模型: lingyun01_lift_motor_*.STL                              -->
+    <!-- 上升电机 (rotor_0~3, 输出0-3) - 推力向上, 四角布局               -->
+    <!--   rotor_0 上升左前 (FLU: 7.557, 6.338, -0.584)   CCW             -->
+    <!--   rotor_1 上升右前 (FLU: 7.557, -6.337, -0.584)  CW              -->
+    <!--   rotor_2 上升左后 (FLU: -9.843, 5.814, -0.584)  CW              -->
+    <!--   rotor_3 上升右后 (FLU: -9.843, -5.812, -0.584) CCW            -->
+    <!--   推力沿局部+Z (FLU Z向上), joint axis=(0,0,1)                   -->
+    <!--   motorConstant>0: 推力沿+Z (向上, 上升)                         -->
     <!-- ================================================================ -->
 
-    <!-- ==================== -->
-    <!-- 升力电机0: 前部升力电机1 (front1) - 推力向上 -->
-    <!-- STL使用SW绝对坐标(螺旋桨轴沿X), 需旋转-90°Y使轴朝上Z -->
-    <!-- rotor使用STL绝对坐标+旋转 -->
-    <!-- ==================== -->
-
-    <!-- 螺旋桨link: link pose定义物理推力点, visual/collision pose=负偏移(补偿STL绝对坐标) -->
     <link name='rotor_0'>
-      <pose>11.225 -2.894 0.331 0 0 0</pose>
+      <pose>7.557 6.338 -0.584 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -204,11 +179,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_0_visual'>
-        <pose>-11.225 2.894 -0.331 0 0 0</pose>
+        <pose>-7.557 -6.338 0.584 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_lift_motor_front1.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/lift_up_lf.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -219,7 +194,7 @@
         </material>
       </visual>
       <collision name='rotor_0_collision'>
-        <pose>-11.225 2.894 -0.331 0 0 0</pose>
+        <pose>-7.557 -6.338 0.584 0 0 0</pose>
         <geometry><cylinder><radius>0.8</radius><length>0.05</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
@@ -227,8 +202,6 @@
         </surface>
       </collision>
     </link>
-
-    <!-- 螺旋桨旋转关节: parent=base_link, axis=+Z(推力向上) -->
     <joint name='rotor_0_joint' type='revolute'>
       <parent>base_link</parent>
       <child>rotor_0</child>
@@ -245,13 +218,8 @@
       </axis>
     </joint>
 
-    <!-- ==================== -->
-    <!-- 升力电机1: 前部升力电机2 (front2) - 推力向下 -->
-    <!-- STL绝对坐标: +9.21, -2.89, +0.33 -->
-    <!-- ==================== -->
-
     <link name='rotor_1'>
-      <pose>9.215 -2.894 0.331 0 0 0</pose>
+      <pose>7.557 -6.337 -0.584 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -264,11 +232,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_1_visual'>
-        <pose>-9.215 2.894 -0.331 0 0 0</pose>
+        <pose>-7.557 6.337 0.584 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_lift_motor_front2.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/lift_up_rf.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -279,7 +247,7 @@
         </material>
       </visual>
       <collision name='rotor_1_collision'>
-        <pose>-9.215 2.894 -0.331 0 0 0</pose>
+        <pose>-7.557 6.337 0.584 0 0 0</pose>
         <geometry><cylinder><radius>0.8</radius><length>0.05</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
@@ -287,8 +255,6 @@
         </surface>
       </collision>
     </link>
-
-    <!-- 螺旋桨旋转关节: parent=base_link, axis=+Z, motorConstant为负产生向下推力 -->
     <joint name='rotor_1_joint' type='revolute'>
       <parent>base_link</parent>
       <child>rotor_1</child>
@@ -305,13 +271,8 @@
       </axis>
     </joint>
 
-    <!-- ==================== -->
-    <!-- 升力电机2: 后部升力电机1 (back1) - 推力向下 -->
-    <!-- STL绝对坐标: -13.54, -2.89, +0.33 -->
-    <!-- ==================== -->
-
     <link name='rotor_2'>
-      <pose>-13.535 -2.894 0.331 0 0 0</pose>
+      <pose>-9.843 5.814 -0.584 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -324,11 +285,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_2_visual'>
-        <pose>13.535 2.894 -0.331 0 0 0</pose>
+        <pose>9.843 -5.814 0.584 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_lift_motor_back1.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/lift_up_lb.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -339,7 +300,7 @@
         </material>
       </visual>
       <collision name='rotor_2_collision'>
-        <pose>13.535 2.894 -0.331 0 0 0</pose>
+        <pose>9.843 -5.814 0.584 0 0 0</pose>
         <geometry><cylinder><radius>0.8</radius><length>0.05</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
@@ -347,8 +308,6 @@
         </surface>
       </collision>
     </link>
-
-    <!-- 螺旋桨旋转关节: parent=base_link, axis=+Z, motorConstant为负产生向下推力 -->
     <joint name='rotor_2_joint' type='revolute'>
       <parent>base_link</parent>
       <child>rotor_2</child>
@@ -365,13 +324,8 @@
       </axis>
     </joint>
 
-    <!-- ==================== -->
-    <!-- 升力电机3: 后部升力电机2 (back2) - 推力向上 -->
-    <!-- STL绝对坐标: -15.53, -2.89, +0.33 -->
-    <!-- ==================== -->
-
     <link name='rotor_3'>
-      <pose>-15.525 -2.894 0.331 0 0 0</pose>
+      <pose>-9.843 -5.812 -0.584 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -384,11 +338,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_3_visual'>
-        <pose>15.525 2.894 -0.331 0 0 0</pose>
+        <pose>9.843 5.812 0.584 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_lift_motor_back2.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/lift_up_rb.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -399,7 +353,7 @@
         </material>
       </visual>
       <collision name='rotor_3_collision'>
-        <pose>15.525 2.894 -0.331 0 0 0</pose>
+        <pose>9.843 5.812 0.584 0 0 0</pose>
         <geometry><cylinder><radius>0.8</radius><length>0.05</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
@@ -407,8 +361,6 @@
         </surface>
       </collision>
     </link>
-
-    <!-- 螺旋桨旋转关节: parent=base_link, axis=+Z(推力向上) -->
     <joint name='rotor_3_joint' type='revolute'>
       <parent>base_link</parent>
       <child>rotor_3</child>
@@ -425,19 +377,16 @@
       </axis>
     </joint>
 
-    <!-- ================================ -->
-    <!-- 推进电机 (输出4-7)                 -->
-    <!-- 安装位置: 飞艇下部               -->
-    <!-- 功能: 水平推进+差动偏航 (X轴方向) -->
-    <!-- STL模型: lingyun01_thrust_motor_*.STL -->
-    <!-- 注意: 推进电机link旋转90度绕Y轴, 使Z轴指向前方(X轴), 推力沿Z轴施加即向前 -->
-    <!-- ================================ -->
+    <!-- ================================================================ -->
+    <!-- 下降电机 (rotor_4~5, 输出4-5) - 推力向下, 中轴前后               -->
+    <!--   rotor_4 下降前 (FLU: 6.957, 0.017, 0.505)   CW                 -->
+    <!--   rotor_5 下降后 (FLU: -11.443, 0.017, 0.505) CCW               -->
+    <!--   推力沿局部-Z (FLU Z向下), joint axis=(0,0,1)                   -->
+    <!--   motorConstant<0: 推力沿-Z (向下, 下降)                         -->
+    <!-- ================================================================ -->
 
-    <!-- 推进电机0: 左前推进电机 (LF) [STL绝对坐标: +2.55, +2.39, -1.51] -->
-    <!-- link pose绕Y轴+90度: 使link局部Z轴指向base_link +X方向(推力向前) -->
-    <!-- visual/collision pose: 补偿link旋转, 使mesh在世界坐标系中位置正确 -->
     <link name='rotor_4'>
-      <pose>2.55 2.39 -1.51 0 1.5708 0</pose>
+      <pose>6.957 0.017 0.505 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -450,11 +399,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_4_visual'>
-        <pose>-1.51 -2.39 -2.55 0 -1.5708 0</pose>
+        <pose>-6.957 -0.017 -0.505 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_thrust_motor_LF.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/lift_dn_f.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -465,8 +414,8 @@
         </material>
       </visual>
       <collision name='rotor_4_collision'>
-        <pose>-1.51 -2.39 -2.55 0 -1.5708 0</pose>
-        <geometry><cylinder><radius>1.0</radius><length>0.08</length></cylinder></geometry>
+        <pose>-6.957 -0.017 -0.505 0 0 0</pose>
+        <geometry><cylinder><radius>0.8</radius><length>0.05</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
           <friction><ode/></friction>
@@ -489,9 +438,8 @@
       </axis>
     </joint>
 
-    <!-- 推进电机1: 左后推进电机 (LB) [STL绝对坐标: -2.55, +2.39, -1.51] -->
     <link name='rotor_5'>
-      <pose>-2.55 2.39 -1.51 0 1.5708 0</pose>
+      <pose>-11.443 0.017 0.505 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -504,11 +452,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_5_visual'>
-        <pose>-1.51 -2.39 2.55 0 -1.5708 0</pose>
+        <pose>11.443 -0.017 -0.505 0 0 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_thrust_motor_LB.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/lift_dn_b.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -519,8 +467,8 @@
         </material>
       </visual>
       <collision name='rotor_5_collision'>
-        <pose>-1.51 -2.39 2.55 0 -1.5708 0</pose>
-        <geometry><cylinder><radius>1.0</radius><length>0.08</length></cylinder></geometry>
+        <pose>11.443 -0.017 -0.505 0 0 0</pose>
+        <geometry><cylinder><radius>0.8</radius><length>0.05</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
           <friction><ode/></friction>
@@ -543,9 +491,21 @@
       </axis>
     </joint>
 
-    <!-- 推进电机2: 右前推进电机 (RF) [STL绝对坐标: +2.55, -8.19, -1.51] -->
+    <!-- ================================================================ -->
+    <!-- 推进电机 (rotor_6~9, 输出6-9) - 水平推进+差动偏航                -->
+    <!--   rotor_6 推进左前 (FLU: 2.230, 5.888, -2.378)   CW              -->
+    <!--   rotor_7 推进右前 (FLU: 2.230, -5.887, -2.378)  CCW            -->
+    <!--   rotor_8 推进左后 (FLU: -2.971, 5.888, -2.378)  CW             -->
+    <!--   rotor_9 推进右后 (FLU: -2.972, -5.887, -2.378) CCW           -->
+    <!--                                                              -->
+    <!-- 推力方向: link pose绕Y轴+90度, 使局部Z轴指向FLU +X (向前)     -->
+    <!-- 旋转轴: joint axis=(0,0,1) (局部Z=FLU X, 绕前后轴旋转)       -->
+    <!-- visual/collision pose = R_y(-90) 补偿link旋转                -->
+    <!--   t_V = -R_y(-90) * t_L, R_V = R_y(-90)                      -->
+    <!-- ================================================================ -->
+
     <link name='rotor_6'>
-      <pose>2.55 -8.19 -1.51 0 1.5708 0</pose>
+      <pose>2.230 5.888 -2.378 0 1.5708 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -558,11 +518,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_6_visual'>
-        <pose>-1.51 8.19 -2.55 0 -1.5708 0</pose>
+        <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_thrust_motor_RF.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/thrust_lf.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -573,7 +533,7 @@
         </material>
       </visual>
       <collision name='rotor_6_collision'>
-        <pose>-1.51 8.19 -2.55 0 -1.5708 0</pose>
+        <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>
         <geometry><cylinder><radius>1.0</radius><length>0.08</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
@@ -597,9 +557,8 @@
       </axis>
     </joint>
 
-    <!-- 推进电机3: 右后推进电机 (RB) [STL绝对坐标: -2.55, -8.19, -1.51] -->
     <link name='rotor_7'>
-      <pose>-2.55 -8.19 -1.51 0 1.5708 0</pose>
+      <pose>2.230 -5.887 -2.378 0 1.5708 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -612,11 +571,11 @@
         </inertia>
       </inertial>
       <visual name='rotor_7_visual'>
-        <pose>-1.51 8.19 2.55 0 -1.5708 0</pose>
+        <pose>-2.378 5.887 -2.230 0 -1.5708 0</pose>
         <geometry>
           <mesh>
             <scale>1 1 1</scale>
-            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/lingyun01_thrust_motor_RB.STL</uri>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/thrust_rf.STL</uri>
           </mesh>
         </geometry>
         <material>
@@ -627,7 +586,7 @@
         </material>
       </visual>
       <collision name='rotor_7_collision'>
-        <pose>-1.51 8.19 2.55 0 -1.5708 0</pose>
+        <pose>-2.378 5.887 -2.230 0 -1.5708 0</pose>
         <geometry><cylinder><radius>1.0</radius><length>0.08</length></cylinder></geometry>
         <surface>
           <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
@@ -651,14 +610,291 @@
       </axis>
     </joint>
 
+    <link name='rotor_8'>
+      <pose>-2.971 5.888 -2.378 0 1.5708 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='rotor_8_visual'>
+        <pose>-2.378 -5.888 2.971 0 -1.5708 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/thrust_lb.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/DarkGrey</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+      <collision name='rotor_8_collision'>
+        <pose>-2.378 -5.888 2.971 0 -1.5708 0</pose>
+        <geometry><cylinder><radius>1.0</radius><length>0.08</length></cylinder></geometry>
+        <surface>
+          <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
+          <friction><ode/></friction>
+        </surface>
+      </collision>
+    </link>
+    <joint name='rotor_8_joint' type='revolute'>
+      <parent>base_link</parent>
+      <child>rotor_8</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <link name='rotor_9'>
+      <pose>-2.972 -5.887 -2.378 0 1.5708 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='rotor_9_visual'>
+        <pose>-2.378 5.887 2.972 0 -1.5708 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/meshes/V2_FLU/thrust_rb.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/DarkGrey</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+      <collision name='rotor_9_collision'>
+        <pose>-2.378 5.887 2.972 0 -1.5708 0</pose>
+        <geometry><cylinder><radius>1.0</radius><length>0.08</length></cylinder></geometry>
+        <surface>
+          <contact><ode><min_depth>0.001</min_depth><max_vel>0</max_vel></ode></contact>
+          <friction><ode/></friction>
+        </surface>
+      </collision>
+    </link>
+    <joint name='rotor_9_joint' type='revolute'>
+      <parent>base_link</parent>
+      <child>rotor_9</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <!-- ================================================================ -->
+    <!-- 风机/阀门可视化占位 (4风机 + 4阀门, 每囊1风机1阀门)            -->
+    <!-- 位置: 每个囊体最底部往上1m (即囊体中心下方)                    -->
+    <!-- 四囊底部 (FLU, 相对主体中心, 从主体STL聚类分析):                -->
+    <!--   左主囊(后): (-3.075, +6.563, -3.658)  风机Z=-2.658            -->
+    <!--   右主囊(后): (-3.075, -6.563, -3.658)  风机Z=-2.658            -->
+    <!--   左副囊(前): (+2.516, +6.563, -3.261)  风机Z=-2.261            -->
+    <!--   右副囊(前): (+2.516, -6.563, -3.262)  风机Z=-2.262            -->
+    <!-- 风机=绿色圆柱(鼓风), 阀门=黄色圆盘(开闭), 风机在上/阀门在下     -->
+    <!-- 仅可视化占位, 物理作用由AirshipDynamics插件执行器状态实现      -->
+    <!-- ================================================================ -->
+
+    <!-- 左主囊(后): 风机 + 阀门 (底部-3.658, 往上1m -> Z=-2.658) -->
+    <link name='blower_main_left'>
+      <pose>-3.075 6.563 -2.658 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='blower_main_left_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
+      </visual>
+    </link>
+    <link name='valve_main_left'>
+      <pose>-3.075 6.563 -2.958 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='valve_main_left_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
+      </visual>
+    </link>
+
+    <!-- 右主囊(后): 风机 + 阀门 (底部-3.658, 往上1m -> Z=-2.658) -->
+    <link name='blower_main_right'>
+      <pose>-3.075 -6.563 -2.658 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='blower_main_right_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
+      </visual>
+    </link>
+    <link name='valve_main_right'>
+      <pose>-3.075 -6.563 -2.958 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='valve_main_right_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
+      </visual>
+    </link>
+
+    <!-- 左副囊(前): 风机 + 阀门 (底部-3.261, 往上1m -> Z=-2.261) -->
+    <link name='blower_aux_left'>
+      <pose>2.516 6.563 -2.261 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='blower_aux_left_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
+      </visual>
+    </link>
+    <link name='valve_aux_left'>
+      <pose>2.516 6.563 -2.561 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='valve_aux_left_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
+      </visual>
+    </link>
+
+    <!-- 右副囊(前): 风机 + 阀门 (底部-3.262, 往上1m -> Z=-2.262) -->
+    <link name='blower_aux_right'>
+      <pose>2.516 -6.563 -2.262 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='blower_aux_right_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
+      </visual>
+    </link>
+    <link name='valve_aux_right'>
+      <pose>2.516 -6.563 -2.562 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <velocity_decay/>
+      <inertial>
+        <mass>1e-8</mass>
+        <inertia>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz>
+          <izz>0.0001</izz>
+        </inertia>
+      </inertial>
+      <visual name='valve_aux_right_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
+      </visual>
+    </link>
+
     <!-- ==================== -->
     <!-- 电机插件配置       -->
     <!-- ==================== -->
 
-    <!-- 升力电机插件 (0-3): 垂直推力 (Z轴) -->
-    <!-- 推力方向由rotor_joint的axis方向决定: +Z=向上, -Z=向下 -->
-    <!-- M0/M3(上升): motorConstant=1.416e-03, F_max = 1.416e-03 * 372^2 = 196N (20kg) -->
-    <!-- M1/M2(下降): motorConstant=-2.832e-03, F_max = |-2.832e-03| * 372^2 = 392N (40kg) -->
+    <!-- 上升电机插件 (rotor_0~3): 推力向上 (沿局部+Z) -->
+    <!-- T-MOTOR A10 (KV120), 最大推力 222.5N (22.7kg) -->
+    <!-- motorConstant = 222.5 / 372^2 = 1.608e-03 (占位, 待用户提供实际转速) -->
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_0_joint</jointName>
       <linkName>rotor_0</linkName>
@@ -666,7 +902,7 @@
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
-      <motorConstant>1.416e-03</motorConstant>
+      <motorConstant>1.608e-03</motorConstant>
       <momentConstant>0.002</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>0</motorNumber>
@@ -683,7 +919,7 @@
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
-      <motorConstant>-2.832e-03</motorConstant>
+      <motorConstant>1.608e-03</motorConstant>
       <momentConstant>0.002</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>1</motorNumber>
@@ -700,7 +936,7 @@
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
-      <motorConstant>-2.832e-03</motorConstant>
+      <motorConstant>1.608e-03</motorConstant>
       <momentConstant>0.002</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>2</motorNumber>
@@ -717,7 +953,7 @@
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
-      <motorConstant>1.416e-03</motorConstant>
+      <motorConstant>1.608e-03</motorConstant>
       <momentConstant>0.002</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>3</motorNumber>
@@ -727,25 +963,22 @@
       <motorType>velocity</motorType>
     </plugin>
 
-    <!-- 推进电机插件 (4-7): 水平推进+偏航 -->
-    <!-- 反扭矩对称方案(前后对称): 前部ccw, 后部cw -->
-    <!-- 推进电机旋转轴沿X轴(Roll轴), 反扭矩产生Roll力矩 -->
-    <!-- 前部两个ccw: 反扭矩+Roll; 后部两个cw: 反扭矩-Roll; 4电机同速时抵消 -->
-    <!-- 偏航差动时: 同侧前后反扭矩方向相反, 也抵消 -->
-    <!-- motorConstant>0: 推力沿局部Z轴=全局X轴(向前), 4电机推力都向前 -->
+    <!-- 下降电机插件 (rotor_4~5): 推力向下 (沿局部-Z) -->
+    <!-- T-MOTOR A10 (KV120), 最大推力 222.5N (22.7kg) -->
+    <!-- motorConstant 负值 = 推力沿-Z (向下) -->
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_4_joint</jointName>
       <linkName>rotor_4</linkName>
-      <turningDirection>ccw</turningDirection>
-      <timeConstantUp>0.15</timeConstantUp>
-      <timeConstantDown>0.2</timeConstantDown>
-      <maxRotVelocity>394.8</maxRotVelocity>
-      <motorConstant>4.66e-03</motorConstant>
-      <momentConstant>0.02</momentConstant>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.2</timeConstantUp>
+      <timeConstantDown>0.3</timeConstantDown>
+      <maxRotVelocity>372.0</maxRotVelocity>
+      <motorConstant>-1.608e-03</motorConstant>
+      <momentConstant>0.002</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>4</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
-      <rollingMomentCoefficient>0</rollingMomentCoefficient>
+      <rollingMomentCoefficient>1e-05</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
@@ -753,28 +986,32 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_5_joint</jointName>
       <linkName>rotor_5</linkName>
-      <turningDirection>cw</turningDirection>
-      <timeConstantUp>0.15</timeConstantUp>
-      <timeConstantDown>0.2</timeConstantDown>
-      <maxRotVelocity>394.8</maxRotVelocity>
-      <motorConstant>4.66e-03</motorConstant>
-      <momentConstant>0.02</momentConstant>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.2</timeConstantUp>
+      <timeConstantDown>0.3</timeConstantDown>
+      <maxRotVelocity>372.0</maxRotVelocity>
+      <motorConstant>-1.608e-03</motorConstant>
+      <momentConstant>0.002</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>5</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
-      <rollingMomentCoefficient>0</rollingMomentCoefficient>
+      <rollingMomentCoefficient>1e-05</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
 
+    <!-- 推进电机插件 (rotor_6~9): 水平推力向前 (link旋转后局部Z=FLU X) -->
+    <!-- HOBBYWING P65M, 最大推力 1352.4N (138kg) -->
+    <!-- motorConstant = 1352.4 / 394.8^2 = 8.677e-03 (占位, 待用户提供实际转速) -->
+    <!-- 旋转方向: 左侧CW, 右侧CCW (左右对转, 滚转反扭矩抵消) -->
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_6_joint</jointName>
       <linkName>rotor_6</linkName>
-      <turningDirection>ccw</turningDirection>
+      <turningDirection>cw</turningDirection>
       <timeConstantUp>0.15</timeConstantUp>
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
-      <motorConstant>4.66e-03</motorConstant>
+      <motorConstant>8.677e-03</motorConstant>
       <momentConstant>0.02</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>6</motorNumber>
@@ -787,14 +1024,48 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_7_joint</jointName>
       <linkName>rotor_7</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.15</timeConstantUp>
+      <timeConstantDown>0.2</timeConstantDown>
+      <maxRotVelocity>394.8</maxRotVelocity>
+      <motorConstant>8.677e-03</motorConstant>
+      <momentConstant>0.02</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>7</motorNumber>
+      <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
+      <rollingMomentCoefficient>0</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>rotor_8_joint</jointName>
+      <linkName>rotor_8</linkName>
       <turningDirection>cw</turningDirection>
       <timeConstantUp>0.15</timeConstantUp>
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
-      <motorConstant>4.66e-03</motorConstant>
+      <motorConstant>8.677e-03</motorConstant>
       <momentConstant>0.02</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
-      <motorNumber>7</motorNumber>
+      <motorNumber>8</motorNumber>
+      <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
+      <rollingMomentCoefficient>0</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>rotor_9_joint</jointName>
+      <linkName>rotor_9</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.15</timeConstantUp>
+      <timeConstantDown>0.2</timeConstantDown>
+      <maxRotVelocity>394.8</maxRotVelocity>
+      <motorConstant>8.677e-03</motorConstant>
+      <momentConstant>0.02</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>9</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
       <rollingMomentCoefficient>0</rollingMomentCoefficient>
       <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
@@ -809,8 +1080,8 @@
       <air_density>1.225</air_density>
       <hull_volume>1800.0</hull_volume>
       <net_buoyancy>0</net_buoyancy>
-      <buoyancy_offset>-0.012 -2.894 -0.009</buoyancy_offset>
-      <buoyancy_center>-0.012 -2.894 -0.009</buoyancy_center>
+      <buoyancy_offset>0 0 -1.5</buoyancy_offset>
+      <buoyancy_center>0 0 -1.5</buoyancy_center>
       <force_inviscid_coeff>5.0</force_inviscid_coeff>
       <force_viscous_coeff>270.0</force_viscous_coeff>
       <moment_inviscid_coeff>400.0</moment_inviscid_coeff>
@@ -820,7 +1091,7 @@
       <dist_cov>0.0</dist_cov>
       <tether_stiffness>0</tether_stiffness>
       <tether_damping>0</tether_damping>
-      <tether_anchor>-0.012 -2.894 0</tether_anchor>
+      <tether_anchor>0 0 -1.5</tether_anchor>
       <m11>187</m11>
       <m22>1496</m22>
       <m33>787</m33>
@@ -828,15 +1099,10 @@
       <m55>5000</m55>
       <m66>5000</m66>
       <!-- 旋转阻尼系数 (N·m·s/rad) - 基于等效椭球体模型计算 -->
-      <!-- 飞艇等效椭球体: a=17.35m, b=9.25m, c=6.4m, V=1800m³ -->
-      <!-- 公式: C_rot = 0.5 × ρ × V^(2/3) × L² × C_l_rot -->
-      <!-- X轴(Roll): L=12.8m, C_l_rot=0.10, 基础值14840, 四气囊修正×3.0=45000 -->
       <rot_damping_x>45000</rot_damping_x>
-      <!-- Y轴(Pitch): L=34.7m, C_l_rot=0.20, 计算值216631≈220000 -->
       <rot_damping_y>220000</rot_damping_y>
-      <!-- Z轴(Yaw): L=18.5m, C_l_rot=0.15, 基础值46378, 四气囊修正×3.0=140000 -->
       <rot_damping_z>140000</rot_damping_z>
-      <!-- 四气囊参数 (统一浮力调节) -->
+      <!-- 四气囊参数 (统一浮力调节, 4囊同步) -->
       <ballast_mass_max>128.5</ballast_mass_max>
     </plugin>
 
