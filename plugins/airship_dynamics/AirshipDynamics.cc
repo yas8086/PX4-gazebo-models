@@ -92,11 +92,10 @@ public:
   // 4气囊完全同步充放气, 总质量作为可变载荷影响垂直浮力
   double ballastMass[4]{0.0, 0.0, 0.0, 0.0};
 
-  // 四气囊执行器状态 (0或1)
-  uint8_t blowerInState[4]{0, 0, 0, 0};
-  uint8_t blowerOutState[4]{0, 0, 0, 0};
-  uint8_t valveInState[4]{0, 0, 0, 0};
-  uint8_t valveOutState[4]{0, 0, 0, 0};
+  // 四气囊执行器状态 (0或1) - V2: 每囊1风机+1阀门
+  // 充气 = 风机+阀门(鼓风), 排气 = 仅阀门(自然排气)
+  uint8_t blowerState[4]{0, 0, 0, 0};
+  uint8_t valveState[4]{0, 0, 0, 0};
 
   // 单气囊最大质量 (kg)
   double ballastMassMax{128.5};
@@ -118,17 +117,16 @@ public:
   void UpdateBallastActuator(const msgs::Vector3d &_msg)
   {
     std::lock_guard<std::mutex> lock(this->mtx);
-    // x = 气囊索引 (0=LI, 1=LO, 2=RI, 3=RO)
-    // y = 执行器状态位图: bit0=blower_in, bit1=blower_out, bit2=valve_in, bit3=valve_out
+    // x = 气囊索引 (0=左主囊, 1=右主囊, 2=左副囊, 3=右副囊)
+    // y = 执行器状态位图: bit0=blower(风机), bit1=valve(阀门)
     // z = 当前空气质量 (kg)
     int idx = static_cast<int>(_msg.x());
     if (idx < 0 || idx > 3) return;
 
     uint8_t state = static_cast<uint8_t>(_msg.y());
-    blowerInState[idx]  = state & 0x01;
-    blowerOutState[idx] = (state >> 1) & 0x01;
-    valveInState[idx]   = (state >> 2) & 0x01;
-    valveOutState[idx]  = (state >> 3) & 0x01;
+    // V2: bit0=blower(风机), bit1=valve(阀门)
+    blowerState[idx] = state & 0x01;
+    valveState[idx] = (state >> 1) & 0x01;
 
     ballastMass[idx] = _msg.z();
   }
