@@ -70,10 +70,11 @@
           </mesh>
         </geometry>
         <material>
-          <ambient>1.0 1.0 1.0 1.0</ambient>
-          <diffuse>1.0 1.0 1.0 1.0</diffuse>
-          <specular>0.3 0.3 0.3 0.9</specular>
-          <emissive>0.0 0.0 0.0 1</emissive>
+          <!-- V1版本奶白色材质: 偏蓝一点点的奶白 (R0.93 G0.93 B0.95) -->
+          <!-- 修复: ambient alpha 从0.92改为1.0, 消除半透明渲染导致的   -->
+          <!-- 左右渲染不一致(半透明深度排序问题会让一侧露出内部物体)   -->
+          <ambient>0.93 0.93 0.95 1.0</ambient>
+          <diffuse>0.93 0.93 0.95 1.0</diffuse>
         </material>
       </visual>
 
@@ -718,19 +719,30 @@
 
     <!-- ================================================================ -->
     <!-- 风机/阀门可视化占位 (4风机 + 4阀门, 每囊1风机1阀门)            -->
-    <!-- 位置: 每个囊体最底部往上1m (即囊体中心下方)                    -->
-    <!-- 四囊底部 (FLU, 相对主体中心, 从主体STL聚类分析):                -->
-    <!--   左主囊(后): (-3.075, +6.563, -3.658)  风机Z=-2.658            -->
-    <!--   右主囊(后): (-3.075, -6.563, -3.658)  风机Z=-2.658            -->
-    <!--   左副囊(前): (+2.516, +6.563, -3.261)  风机Z=-2.261            -->
-    <!--   右副囊(前): (+2.516, -6.563, -3.262)  风机Z=-2.262            -->
-    <!-- 风机=绿色圆柱(鼓风), 阀门=黄色圆盘(开闭), 风机在上/阀门在下     -->
-    <!-- 仅可视化占位, 物理作用由AirshipDynamics插件执行器状态实现      -->
-    <!-- ================================================================ -->
+    <!-- 位置: X统一=0(椭球几何中心, 长轴沿X),                           -->
+    <!--       Y=各囊相对STL中心Y=0(即base_link原点)的左右偏移:          -->
+    <!--         主囊偏移3.3m, 副囊偏移8.6m (两侧对称, SolidWorks实测)   -->
+    <!--       Z=各囊底部+1m(底部=椭球Z中心 - 短轴半径)                -->
+    <!-- 短轴半径: 主囊=3.1m, 副囊=2.5m(用户提供)                      -->
+    <!-- STL实测(convert_stl_to_flu.py平移到中心): 主囊Y=±3.15, 副囊Y=±8.9 -->
+    <!--                                                                      -->
+    <!--  FLU_Y+ (左) ---------- Y增大方向 -------> FLU_Y- (右)            -->
+    <!--  [LO左外副囊]  [LI左内主囊]  [RI右内主囊]  [RO右外副囊]           -->
+    <!--   Y=+8.6       Y=+3.3       Y=-3.3       Y=-8.6                  -->
+    <!--   短轴R=2.5m    短轴R=3.1m    短轴R=3.1m    短轴R=2.5m            -->
+    <!--   底Z=-3.158    底Z=-2.651    底Z=-2.651    底Z=-3.158             -->
+    <!--   风机Z=-2.158  风机Z=-1.651  风机Z=-1.651  风机Z=-2.158          -->
+    <!--   阀门Z=-2.458  阀门Z=-1.951  阀门Z=-1.951  阀门Z=-2.458          -->
+    <!--                                                                      -->
+    <!-- 风机=绿色圆柱(鼓风), 阀门=黄色圆盘(开闭), 风机在上/阀门在下      -->
+    <!-- 尺寸: 原始尺寸30% (50% x 70%), 风机R=0.14/L=0.21, 阀R=0.07/L=0.105 -->
+    <!-- 仅可视化占位, 物理作用由AirshipDynamics插件执行器状态实现         -->
+    <!-- ==================================================================== -->
 
-    <!-- 左主囊(后): 风机 + 阀门 (底部-3.658, 往上1m -> Z=-2.658) -->
+    <!-- 左内主囊LI: 风机 + 阀门 (Y=+3.3, Z中心=+0.45, 短轴R=3.1) -->
+    <!-- 底部Z = 0.45 - 3.1 = -2.651, 风机Z = -2.651 + 1 = -1.651    -->
     <link name='blower_main_left'>
-      <pose>-3.075 6.563 -2.658 0 0 0</pose>
+      <pose>0 3.3 -1.651 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -744,12 +756,12 @@
       </inertial>
       <visual name='blower_main_left_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.14</radius><length>0.21</length></cylinder></geometry>
         <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
       </visual>
     </link>
     <link name='valve_main_left'>
-      <pose>-3.075 6.563 -2.958 0 0 0</pose>
+      <pose>0 3.3 -1.951 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -763,14 +775,15 @@
       </inertial>
       <visual name='valve_main_left_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.07</radius><length>0.105</length></cylinder></geometry>
         <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
       </visual>
     </link>
 
-    <!-- 右主囊(后): 风机 + 阀门 (底部-3.658, 往上1m -> Z=-2.658) -->
+    <!-- 右内主囊RI: 风机 + 阀门 (Y=-3.3, Z中心=+0.45, 短轴R=3.1) -->
+    <!-- 底部Z = 0.45 - 3.1 = -2.651, 风机Z = -2.651 + 1 = -1.651    -->
     <link name='blower_main_right'>
-      <pose>-3.075 -6.563 -2.658 0 0 0</pose>
+      <pose>0 -3.3 -1.651 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -784,12 +797,12 @@
       </inertial>
       <visual name='blower_main_right_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.14</radius><length>0.21</length></cylinder></geometry>
         <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
       </visual>
     </link>
     <link name='valve_main_right'>
-      <pose>-3.075 -6.563 -2.958 0 0 0</pose>
+      <pose>0 -3.3 -1.951 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -803,14 +816,15 @@
       </inertial>
       <visual name='valve_main_right_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.07</radius><length>0.105</length></cylinder></geometry>
         <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
       </visual>
     </link>
 
-    <!-- 左副囊(前): 风机 + 阀门 (底部-3.261, 往上1m -> Z=-2.261) -->
+    <!-- 左外副囊LO: 风机 + 阀门 (Y=+8.6, Z中心=-0.66, 短轴R=2.5) -->
+    <!-- 底部Z = -0.66 - 2.5 = -3.158, 风机Z = -3.158 + 1 = -2.158  -->
     <link name='blower_aux_left'>
-      <pose>2.516 6.563 -2.261 0 0 0</pose>
+      <pose>0 8.6 -2.158 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -824,12 +838,12 @@
       </inertial>
       <visual name='blower_aux_left_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.14</radius><length>0.21</length></cylinder></geometry>
         <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
       </visual>
     </link>
     <link name='valve_aux_left'>
-      <pose>2.516 6.563 -2.561 0 0 0</pose>
+      <pose>0 8.6 -2.458 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -843,14 +857,15 @@
       </inertial>
       <visual name='valve_aux_left_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.07</radius><length>0.105</length></cylinder></geometry>
         <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
       </visual>
     </link>
 
-    <!-- 右副囊(前): 风机 + 阀门 (底部-3.262, 往上1m -> Z=-2.262) -->
+    <!-- 右外副囊RO: 风机 + 阀门 (Y=-8.6, Z中心=-0.66, 短轴R=2.5) -->
+    <!-- 底部Z = -0.66 - 2.5 = -3.158, 风机Z = -3.158 + 1 = -2.158  -->
     <link name='blower_aux_right'>
-      <pose>2.516 -6.563 -2.262 0 0 0</pose>
+      <pose>0 -8.6 -2.158 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -864,12 +879,12 @@
       </inertial>
       <visual name='blower_aux_right_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.4</radius><length>0.6</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.14</radius><length>0.21</length></cylinder></geometry>
         <material><ambient>0.0 0.9 0.3 1</ambient><diffuse>0.0 0.7 0.2 1</diffuse></material>
       </visual>
     </link>
     <link name='valve_aux_right'>
-      <pose>2.516 -6.563 -2.562 0 0 0</pose>
+      <pose>0 -8.6 -2.458 0 0 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
@@ -883,10 +898,49 @@
       </inertial>
       <visual name='valve_aux_right_visual'>
         <pose>0 0 0 0 0 0</pose>
-        <geometry><cylinder><radius>0.2</radius><length>0.3</length></cylinder></geometry>
+        <geometry><cylinder><radius>0.07</radius><length>0.105</length></cylinder></geometry>
         <material><ambient>1.0 0.9 0.1 1</ambient><diffuse>0.8 0.7 0.1 1</diffuse></material>
       </visual>
     </link>
+
+    <!-- ================================================================
+         风机/阀门固定关节 (V2修复)
+         8个风机/阀门link此前无joint连接base_link, 飞艇移动时留在原地.
+         添加fixed joint使其跟随base_link一起运动.
+         child link的pose即为相对base_link的位置.
+         ================================================================ -->
+    <joint name='blower_main_left_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>blower_main_left</child>
+    </joint>
+    <joint name='valve_main_left_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>valve_main_left</child>
+    </joint>
+    <joint name='blower_main_right_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>blower_main_right</child>
+    </joint>
+    <joint name='valve_main_right_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>valve_main_right</child>
+    </joint>
+    <joint name='blower_aux_left_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>blower_aux_left</child>
+    </joint>
+    <joint name='valve_aux_left_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>valve_aux_left</child>
+    </joint>
+    <joint name='blower_aux_right_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>blower_aux_right</child>
+    </joint>
+    <joint name='valve_aux_right_joint' type='fixed'>
+      <parent>base_link</parent>
+      <child>valve_aux_right</child>
+    </joint>
 
     <!-- ==================== -->
     <!-- 电机插件配置       -->
