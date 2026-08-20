@@ -2,9 +2,9 @@
 
 **文件路径**: `/home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/model.sdf`
 
-**最后更新**: 2026年6月25日
+**最后更新**: 2026年8月18日
 
-**版本**: v2.0
+**版本**: v2.4
 
 ---
 
@@ -47,13 +47,13 @@ link（连杆）
 > "all link poses are specified relative to the model frame"
 
 ```xml
-<!-- 以灵云01为例 -->
+<!-- 以灵云01为例 (V2: 上升电机0, 左前) -->
 <link name='rotor_0'>
-  <pose>11.225 -2.894 0.331 0 0 0</pose>
+  <pose>7.557 6.338 -0.584 0 0 0</pose>
 </link>
 ```
 
-这意味着：**rotor_0 的坐标系原点位于模型帧 (11.225, -2.894, 0.331) 处**。
+这意味着：**rotor_0 的坐标系原点位于模型帧 (7.557, 6.338, -0.584) 处**。
 
 **注意**：由于灵云01的模型帧（base_link原点）恰好在世界原点 (0,0,0)，所以 Link pose 的值**看起来**等于世界坐标，但本质上是相对于模型帧的偏移。
 
@@ -62,11 +62,11 @@ link（连杆）
 `<visual>` 和 `<collision>` 的 `<pose>` 是**相对于其所属 Link 坐标系的偏移**。
 
 ```xml
-<link name='rotor_4'>
-  <pose>2.547 2.387 -1.512 0 1.5708 0</pose>       ← 相对于模型帧
+<link name='rotor_6'>
+  <pose>2.230 5.888 -2.378 0 1.5708 0</pose>       ← 相对于模型帧
 
-  <visual name='rotor_4_visual'>
-    <pose>-1.512 -2.387 -2.547 0 -1.5708 0</pose>  ← 相对于Link坐标系
+  <visual name='rotor_6_visual'>
+    <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>  ← 相对于Link坐标系
   </visual>
 </link>
 ```
@@ -138,7 +138,7 @@ joint（关节）
 ```
 
 **SDFormat 的处理方式**：Joint 位于子 Link 的坐标系原点处。
-即 `rotor_0_joint` 的位置 = `rotor_0` 的坐标系原点 = 模型帧 + rotor_0 的 pose = `(11.225, -2.894, 0.331)`。
+即 `rotor_0_joint` 的位置 = `rotor_0` 的坐标系原点 = 模型帧 + rotor_0 的 pose = `(7.557, 6.338, -0.584)`。
 
 ##### ✅ **当 Joint 有显式 `<pose>` 时**
 
@@ -174,7 +174,7 @@ joint（关节）
 
 ### 3️⃣ Link 与 Joint 的协作关系
 
-以升力电机 rotor_0 为例，完整展示 Link 和 Joint 如何配合工作（**新方案：单 Link 结构，无 tilt 舵机**）：
+以上升电机 rotor_0 为例，完整展示 Link 和 Joint 如何配合工作（**V2 新方案：单 Link 结构，无 tilt 舵机，10电机布局**）：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -186,38 +186,38 @@ joint（关节）
 │      │  位置 = 子Link(rotor_0)的坐标系原点                    │
 │      │  轴: Z轴(0,0,1), 无限制                               │
 │      │                                                      │
-│      └── rotor_0: pose=(11.225, -2.894, 0.331)               │
-│              │  相对于模型帧 = (11.225, -2.894, 0.331) OK     │
-│              │  推力方向: motorConstant=1.416e-03 (正值, 向上)│
+│      └── rotor_0: pose=(7.557, 6.338, -0.584)               │
+│              │  相对于模型帧 = (7.557, 6.338, -0.584) OK     │
+│              │  推力方向: motorConstant=+1.608e-03 (正值, 向上)│
 │              │                                              │
-│              └── visual: pose=(-11.225, 2.894, -0.331)       │
+│              └── visual: pose=(-7.557, -6.338, 0.584)       │
 │                 STL最终位置 = link_pose + visual_pose        │
-│                   + STL顶点 = STL顶点(绝对坐标) OK           │
+│                   + STL顶点 = STL顶点(相对主体中心) OK        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **关键结论**：
-- `rotor_0` 的 `<pose>` 值为 (11.225, -2.894, 0.331)，相对于模型帧
-- 由于模型帧在世界原点，rotor_0 的世界坐标即 (11.225, -2.894, 0.331)
+- `rotor_0` 的 `<pose>` 值为 (7.557, 6.338, -0.584)，相对于模型帧
+- 由于模型帧在世界原点，rotor_0 的世界坐标即 (7.557, 6.338, -0.584)
 - Joint 无显式 pose，位于子 Link 的坐标系原点
 - rotor_0 绕自身 Z 轴旋转产生升力，**推力方向由 motorConstant 符号控制**（正值向上，负值向下）
 - **推力施加点**在 rotor_0 的 link 帧原点，即电机安装位置，力臂正确
 
-**STL绝对坐标补偿原理**：
+**STL 相对主体中心补偿原理（V2）**：
 
-由于升力电机 STL 使用 SolidWorks 绝对坐标，而 rotor_0 的 link pose 必须设为电机安装位置（物理正确），需要通过 visual/collision 的 pose 做反向补偿：
+V2 中所有电机 STL 均由 SW 坐标系（毫米）预转换到 FLU 米制（见 `meshes/convert_stl_to_flu.py`），再平移到相对主体中心（`meshes/V2_FLU/`）。因此 STL 顶点坐标本身就是相对主体中心的安装位置，link pose 设为电机安装位置后，通过 visual/collision 的 pose 做反向补偿让 STL 回到正确位置：
 
 ```
 视觉最终位置 = link_pose + visual_pose + STL顶点坐标
-            = (11.225,-2.894,0.331) + (-11.225,2.894,-0.331) + STL顶点
-            = STL顶点(绝对坐标)  --> 视觉位置正确
+            = (7.557,6.338,-0.584) + (-7.557,-6.338,0.584) + STL顶点
+            = STL顶点(相对主体中心的安装位置)  --> 视觉位置正确
 ```
 
 | 元素 | pose值 | 说明 |
 |------|--------|------|
-| rotor_0 link | (11.225, -2.894, 0.331) | 物理推力施加点，电机安装位置 |
-| rotor_0 visual | (-11.225, 2.894, -0.331) | 补偿link pose偏移，使STL回到绝对坐标位置 |
-| rotor_0 collision | (-11.225, 2.894, -0.331) | 同visual，碰撞体也在正确位置 |
+| rotor_0 link | (7.557, 6.338, -0.584) | 物理推力施加点，电机安装位置 |
+| rotor_0 visual | (-7.557, -6.338, 0.584) | 补偿link pose偏移，使STL回到相对主体中心位置 |
+| rotor_0 collision | (-7.557, -6.338, 0.584) | 同visual，碰撞体也在正确位置 |
 
 ---
 
@@ -225,42 +225,46 @@ joint（关节）
 
 ### 📊 Link组件列表
 
-灵云01飞艇模型由**9个Link**组成（新方案：无 tilt_motor 支架，rotor_0~3 直接连接 base_link）：
+灵云01飞艇模型（V2, 10电机）由**19个Link**组成：1个主体 + 10个电机（4上升+2下降+4推进）+ 8个风机/阀门可视化占位（新方案：无 tilt_motor 支架，全部直接连接 base_link）：
 
 | Link名称 | 类型 | 功能 | 质量(kg) |
 |---------|------|------|---------|
 | **base_link** | 主体 | 飞艇气囊主体 | 2206 (仿真占位值) |
-| **rotor_0~3** | 升力螺旋桨 | 产生升力（推力方向由 motorConstant 符号控制） | 0.001 |
-| **rotor_4~7** | 推进螺旋桨 | 产生推力 | 0.001 |
+| **rotor_0~3** | 上升螺旋桨 | 推力向上 (motorConstant=+1.608e-03) | 0.001 |
+| **rotor_4~5** | 下降螺旋桨 | 推力向下 (motorConstant=-1.608e-03) | 0.001 |
+| **rotor_6~9** | 推进螺旋桨 | 水平推力向前 | 0.001 |
+| **blower_main_left/right, blower_aux_left/right** | 充气风机 | 四囊同步充气 (可视化占位) | 0.001 |
+| **valve_main_left/right, valve_aux_left/right** | 排气阀门 | 四囊同步排气 (可视化占位) | 0.001 |
 
 ### 🔗 Link父子关系树状图
 
 ```
-base_link (飞艇主体, 质量: 2206kg 仿真占位值)
+base_link (飞艇主体, 质量: 2206kg 仿真占位值, 重心=(0,0,-1.5))
 │
-├── rotor_0 (升力螺旋桨0, 质量: 0.001kg, motorConstant=+1.416e-03, 推力向上)
-│   └── lingyun01_lift_motor_front1.STL
-│
-├── rotor_1 (升力螺旋桨1, 质量: 0.001kg, motorConstant=-2.832e-03, 推力向下)
-│   └── lingyun01_lift_motor_front2.STL
-│
-├── rotor_2 (升力螺旋桨2, 质量: 0.001kg, motorConstant=-2.832e-03, 推力向下)
-│   └── lingyun01_lift_motor_back1.STL
-│
-├── rotor_3 (升力螺旋桨3, 质量: 0.001kg, motorConstant=+1.416e-03, 推力向上)
-│   └── lingyun01_lift_motor_back2.STL
-│
-├── rotor_4 (推进螺旋桨0, 质量: 0.001kg)
-│   └── lingyun01_thrust_motor_LF.STL
-│
-├── rotor_5 (推进螺旋桨1, 质量: 0.001kg)
-│   └── lingyun01_thrust_motor_LB.STL
-│
-├── rotor_6 (推进螺旋桨2, 质量: 0.001kg)
-│   └── lingyun01_thrust_motor_RF.STL
-│
-└── rotor_7 (推进螺旋桨3, 质量: 0.001kg)
-    └── lingyun01_thrust_motor_RB.STL
+├── rotor_0 (上升左前, 质量: 0.001kg, motorConstant=+1.608e-03, 推力向上, ccw)
+│   └── lift_up_lf.STL
+├── rotor_1 (上升右前, 质量: 0.001kg, motorConstant=+1.608e-03, 推力向上, cw)
+│   └── lift_up_rf.STL
+├── rotor_2 (上升左后, 质量: 0.001kg, motorConstant=+1.608e-03, 推力向上, cw)
+│   └── lift_up_lb.STL
+├── rotor_3 (上升右后, 质量: 0.001kg, motorConstant=+1.608e-03, 推力向上, ccw)
+│   └── lift_up_rb.STL
+├── rotor_4 (下降前, 质量: 0.001kg, motorConstant=-1.608e-03, 推力向下, cw)
+│   └── lift_dn_f.STL
+├── rotor_5 (下降后, 质量: 0.001kg, motorConstant=-1.608e-03, 推力向下, ccw)
+│   └── lift_dn_b.STL
+├── rotor_6 (推进左前, 质量: 0.001kg, motorConstant=+8.677e-03, 推力向前, cw)
+│   └── thrust_lf.STL
+├── rotor_7 (推进右前, 质量: 0.001kg, motorConstant=+8.677e-03, 推力向前, ccw)
+│   └── thrust_rf.STL
+├── rotor_8 (推进左后, 质量: 0.001kg, motorConstant=+8.677e-03, 推力向前, cw)
+│   └── thrust_lb.STL
+├── rotor_9 (推进右后, 质量: 0.001kg, motorConstant=+8.677e-03, 推力向前, ccw)
+│   └── thrust_rb.STL
+├── blower_main_left / blower_main_right (主囊充气风机, Y=±3.3)
+├── blower_aux_left / blower_aux_right (副囊充气风机, Y=±8.6)
+├── valve_main_left / valve_main_right (主囊排气阀门, Y=±3.3)
+└── valve_aux_left / valve_aux_right (副囊排气阀门, Y=±8.6)
 ```
 
 ---
@@ -288,88 +292,81 @@ base_link (飞艇主体, 质量: 2206kg 仿真占位值)
 
 灵云01飞艇定义了一个**参考中心点 C**，作为质心、浮心和 CA_ROTOR 参数的统一参考基准。
 
-**C 点坐标**: `(-0.012, -2.894, -0.009)`
+**C 点坐标（V2）**: `(0, 0, 0)` — base_link原点 = 艇身包围盒中心 (FLU)
+**重心坐标（V2）**: `(0, 0, -1.5)` FLU (base_link/inertial/pose)
 
-#### C 点的计算来源
+#### C 点的计算来源（V2）
 
-C 点是 hull_all.STL（飞艇主体）的**边界框中心**：
+V2 中 C 点 = base_link 原点 = 艇身包围盒中心 (0,0,0)。重心相对 C 点下沉 1.5m，即 (0,0,-1.5)。
 
-```
-C = ((X_min + X_max) / 2,  (Y_min + Y_max) / 2,  (Z_min + Z_max) / 2)
-```
+> **V1历史，已废弃**: V1 设计使用旧重心 `(-0.012, -2.894, -0.009)` 作为参考中心 C（旧 hull_all.STL 边界框中心，Y轴因 SolidWorks 画图原点偏离而不对称）。V2 已重新定义主体中心在原点，重心改为 (0,0,-1.5)。
 
-| 轴 | STL最小值 | STL最大值 | 中心点 |
-|----|----------|----------|--------|
-| X | -16.998 | +16.767 | **-0.116** (约 -0.012) |
-| Y | -13.110 | +7.310 | **-2.900** (约 -2.894) |
-| Z | -3.737 | +4.140 | **+0.202** (约 -0.009) |
-
-> **注意**: Y轴严重不对称（-13.1 到 +7.3），因为结构工程师在SolidWorks中画图时，原点不在飞艇几何中心，而是偏向Y正方向（左侧）。
-
-#### C 点在项目中的使用位置
+#### C 点在项目中的使用位置（V2）
 
 | 文件 | 配置项 | 值 | 说明 |
 |------|--------|-----|------|
-| `model.sdf` | `base_link/inertial/pose` | `-0.012 -2.894 -0.009` | 质心位置（Gazebo物理引擎在此计算动力学） |
-| `model.sdf` | `com_visual/pose` | `-0.012 -2.894 -0.009` | 重心可视化球体位置 |
-| `model.sdf` | `buoyancy_offset` | `-0.012 -2.894 -0.009` | 浮力偏移（AirshipDynamics插件用作comOffset） |
-| `model.sdf` | `buoyancy_center` | `-0.012 -2.894 -0.009` | 浮力中心（与质心重合，消除初始力矩） |
-| `2058_gz_lingyun01` | CA_ROTOR0~7 PX/PY/PZ | `STL绝对坐标 - C` | 电机位置相对于C点的偏移 |
-| `ActuatorEffectivenessCustom.cpp` | `PZ_PROP` 等 | 基于 C 计算 | 推进-俯仰耦合补偿常量 |
+| `model.sdf` | `base_link/inertial/pose` | `0 0 -1.5` | 质心位置（Gazebo物理引擎在此计算动力学） |
+| `model.sdf` | `com_visual/pose` | `0 0 -1.5` | 重心可视化球体位置 |
+| `model.sdf` | `buoyancy_offset` | `0 0 -1.5` | 浮力偏移（AirshipDynamics插件用作comOffset） |
+| `model.sdf` | `buoyancy_center` | `0 0 -1.5` | 浮力中心（与质心重合，消除初始力矩） |
+| `2058_gz_lingyun01` | CA_ROTOR0~9 PX/PY/PZ | `FRD坐标, 相对重心(0,0,-1.5)` | 电机位置相对于重心的偏移（PX4 FRD） |
+| `2058_gz_lingyun01` | `CA_AS_PZ_PROP` 等 | `0.878` | 推进电机到重心垂直距离 (m) |
 
-#### 为什么质心和浮心都设为 C 点？
+#### 为什么质心和浮心都设为 C 点下方同一位置？
 
-将质心（inertial pose）和浮心（buoyancy_center）都设为 C 点，确保：
+将质心（inertial pose）和浮心（buoyancy_center）都设为 (0,0,-1.5)，确保：
 1. **浮力与重力共线** → 不产生初始力矩 → 飞艇不会在启动时旋转
-2. **CA_ROTOR 参数不需要额外偏移** → 电机位置 = STL绝对坐标 - C
-3. **控制分配器参数一致** → PZ_PROP 等常量与 CA_ROTOR 基于同一参考点
+2. **CA_ROTOR 参数基于重心** → 电机位置 = FLU坐标 - 重心，再转FRD
+3. **控制分配器参数一致** → CA_AS_PZ_PROP 等常量与 CA_ROTOR 基于同一参考点（重心）
 
-> **物理精度说明**: C 点是边界框中心而非真正的体积中心（COV ≈ (-0.989, -2.884, -0.379)），但对中性浮力飞艇影响极小，浮力恢复力矩会自动修正微小偏差。
+> **物理精度说明**: V2 重心 (0,0,-1.5) 为暂定设计值，浮力中心与质心重合，对中性浮力飞艇无初始力矩，浮力恢复力矩会自动修正微小偏差。
 
 ### 🔗 坐标系统一性原理
 
-灵云01模型的核心设计原则：**SW坐标系 = base_link坐标系 = 模型帧**，三者统一。
+灵云01模型的核心设计原则：**FLU坐标系 = base_link坐标系 = 模型帧**，三者统一。
 
 #### 为什么必须统一？
 
-只有 base_link 原点 = SW 原点（即 base_link pose = (0,0,0)），电机的 link pose 才能直接使用 SW 绝对坐标，安装到飞艇外皮上 SW 设计的安装位置。推力施加点也在那个位置。
+只有 base_link 原点 = 主体中心（即 base_link pose = (0,0,0)），电机的 link pose 才能直接使用 FLU 相对主体中心坐标，安装到飞艇外皮上设计的位置。推力施加点也在那个位置。
 
 ```
-SW坐标系 = base_link坐标系 = 模型帧
+FLU坐标系 = base_link坐标系 = 模型帧
     |
-    |  电机link pose = SW绝对坐标
+    |  电机link pose = FLU相对主体中心坐标 (V2_FLU预转换)
     |  → 安装位置正确
     |  → 推力施加点 = 电机安装位置
     |
-    |  STL绝对坐标 + visual反向pose = 视觉归位
+    |  STL相对主体中心 + visual反向pose = 视觉归位
     |  → 渲染位置正确
 ```
 
+> **V1历史，已废弃**: V1 使用 SW 绝对坐标 STL（SW坐标系=base_link坐标系=模型帧）。V2 已通过 `meshes/convert_stl_to_flu.py` 将 SW 毫米坐标预转换为 FLU 米制相对主体中心坐标（`meshes/V2_FLU/`），STL 顶点坐标即安装位置。
+
 #### inertial pose（重心）不改变坐标系
 
-base_link 的 `inertial pose = (-0.012, -2.894, -0.009)` 只是告诉 Gazebo 物理引擎"重心在哪"，**不改变坐标系**。所有 link pose 仍然基于模型帧（= SW坐标系）计算。
+base_link 的 `inertial pose = (0, 0, -1.5)` 只是告诉 Gazebo 物理引擎"重心在哪"，**不改变坐标系**。所有 link pose 仍然基于模型帧（= FLU坐标系）计算。
 
 ```
-坐标系: base_link原点 = SW原点 = (0,0,0)        ← 不变
-重心:   inertial_pose = (-0.012, -2.894, -0.009) ← 只是物理属性
-电机0:  link_pose = (11.225, -2.894, 0.331)      ← 基于模型帧(SW坐标系)
+坐标系: base_link原点 = 主体中心 = (0,0,0)        ← 不变
+重心:   inertial_pose = (0, 0, -1.5)              ← 只是物理属性
+电机0:  link_pose = (7.557, 6.338, -0.584)        ← 基于模型帧(FLU坐标系)
 ```
 
 Gazebo 计算力矩时：`力矩 = (推力作用点 - 重心) × 推力方向`，自动使用 inertial_pose 作为参考点。
 
 #### visual/collision 反向补偿的完整公式
 
-由于电机 STL 使用 SW 绝对坐标，而 rotor 的 link pose 必须设为安装位置（物理正确），需要通过 visual/collision 的 pose 做反向补偿：
+由于电机 STL 使用 FLU 相对主体中心坐标，而 rotor 的 link pose 必须设为安装位置（物理正确），需要通过 visual/collision 的 pose 做反向补偿：
 
 ```
 视觉最终位置 = 模型帧 + link_pose + visual_pose + STL顶点坐标
-            = (0,0,0) + (11.225,-2.894,0.331) + (-11.225,2.894,-0.331) + STL顶点
-            = STL顶点(SW绝对坐标)
+            = (0,0,0) + (7.557,6.338,-0.584) + (-7.557,-6.338,0.584) + STL顶点
+            = STL顶点(FLU相对主体中心)
             → 视觉归位正确
 
 物理推力点 = 模型帧 + link_pose
-           = (0,0,0) + (11.225,-2.894,0.331)
-           = (11.225,-2.894,0.331)
+           = (0,0,0) + (7.557,6.338,-0.584)
+           = (7.557,6.338,-0.584)
            → 推力在电机安装位置正确
 ```
 
@@ -381,8 +378,8 @@ Gazebo 计算力矩时：`力矩 = (推力作用点 - 重心) × 推力方向`�
 
 | 系统 | 定义位置 | 参数 | 作用 |
 |------|---------|------|------|
-| PX4控制分配 | 2058_gz_lingyun01 | CA_ROTOR0~7 PX/PY/PZ | 告诉PX4: 电机相对重心C的位置 |
-| PX4控制分配 | ActuatorEffectivenessCustom.cpp | K_LIFT, PZ_PROP等 | 告诉PX4: 推力如何分配到各电机 |
+| PX4控制分配 | 2058_gz_lingyun01 | CA_ROTOR0~9 PX/PY/PZ | 告诉PX4: 电机相对重心(0,0,-1.5)的位置 (FRD) |
+| PX4控制分配 | ActuatorEffectivenessCustom.cpp | CA_AS_K_LUP/LDN/PROP, CA_AS_PZ_PROP等 | 告诉PX4: 推力如何分配到各电机 |
 | Gazebo物理 | model.sdf | rotor link pose | 告诉Gazebo: 电机在世界中的位置 |
 | Gazebo物理 | model.sdf | inertial pose | 告诉Gazebo: 重心位置 |
 
@@ -416,15 +413,15 @@ Gazebo 计算力矩时：`力矩 = (推力作用点 - 重心) × 推力方向`�
 
 ### ✅ 验证测试
 
-**测试场景**：将`rotor_0`的link pose从`(11.225, -2.894, 0.331)`改为`(0, 0, 0)`（不修改visual pose）
+**测试场景**：将`rotor_0`的link pose从`(7.557, 6.338, -0.584)`改为`(0, 0, 0)`（不修改visual pose）
 
 **分析**：
 - rotor_0的link pose相对于模型帧 -> 改为(0,0,0)意味着rotor_0的link帧原点在模型帧原点
-- MulticopterMotorModel在rotor_0的link帧原点施加推力 -> 推力施加点偏离电机安装位置约11.5m
+- MulticopterMotorModel在rotor_0的link帧原点施加推力 -> 推力施加点偏离电机安装位置约9.9m
 - 推力对重心产生巨大力矩，前部电机(X>0)和后部电机(X<0)力矩方向相反
 
 **实际结果**：
-- 推力施加在模型原点(0,0,0)，对重心C(-0.012,-2.894,-0.009)产生巨大俯仰力矩
+- 推力施加在模型原点(0,0,0)，对重心(0,0,-1.5)产生巨大俯仰力矩
 - 前部电机(rotor_0/1)与后部电机(rotor_2/3)力矩方向相反，飞艇姿态失控
 - 飞艇"到处乱飞，绕大圈转"
 
@@ -458,19 +455,22 @@ Gazebo 计算力矩时：`力矩 = (推力作用点 - 重心) × 推力方向`�
 ```xml
 <link name='base_link'>
   <pose>0 0 0 0 0 0</pose>
-  <gravity>false</gravity>
-  <mass>2206</mass>
-  <inertia>
-    <ixx>1000</ixx><ixy>0</ixy><ixz>0</ixz>
-    <iyy>1000</iyy><iyz>0</iyz>
-    <izz>2000</izz>
-  </inertia>
-  <visual name='base_visual'>
+  <inertial>
+    <pose>0 0 -1.5 0 0 0</pose>
+    <mass>2206</mass>
+    <inertia>
+      <ixx>44700.0</ixx><ixy>0</ixy><ixz>0</ixz>
+      <iyy>112200.0</iyy><iyz>0</iyz>
+      <izz>145500.0</izz>
+    </inertia>
+  </inertial>
+  <gravity>true</gravity>
+  <visual name='hull_visual'>
     <pose>0 0 0 0 0 0</pose>
     <geometry>
       <mesh>
         <scale>1 1 1</scale>
-        <uri>file://.../lingyun01_hull_all.STL</uri>
+        <uri>file://.../meshes/V2_FLU/hull_all.STL</uri>
       </mesh>
     </geometry>
   </visual>
@@ -482,37 +482,39 @@ Gazebo 计算力矩时：`力矩 = (推力作用点 - 重心) × 推力方向`�
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | pose | (0,0,0,0,0,0) | Link在父坐标系中的位置和朝向 |
-| gravity | false | 不受重力影响（飞艇靠气囊浮力） |
+| inertial/pose | (0,0,-1.5) | 质心（重心）位置，Gazebo物理引擎在此计算动力学 |
+| gravity | true | 受重力（重力与浮力由AirshipDynamics插件共同作用，净浮力为0） |
 | mass | 2206 kg | 飞艇总质量 (仿真占位值) |
-| inertia | (1000,1000,2000) | 惯性张量（IXX,IYY,IZZ） |
+| inertia | (44700,112200,145500) | 惯性张量（IXX,IYY,IZZ, SolidWorks实测） |
 
 ---
 
-### 2️⃣ 升力电机配置（以rotor_0为例）
+### 2️⃣ 上升/下降电机配置（V2, 以rotor_0为例）
 
-升力电机采用**单Link结构**（新方案：无 tilt 舵机，rotor_0~3 直接连接 base_link），**推力方向由 motorConstant 符号控制**：
-- motorConstant > 0：推力沿 link 局部 +Z 轴（向上，上升）
-- motorConstant < 0：推力沿 link 局部 -Z 轴（向下，下降）
+V2 中升力电机分两组：**上升电机（rotor_0~3，推力向上）+ 下降电机（rotor_4~5，推力向下）**。均采用**单Link结构**（新方案：无 tilt 舵机，直接连接 base_link），**推力方向由 motorConstant 符号控制**：
+- motorConstant > 0：推力沿 link 局部 +Z 轴（向上，上升电机）
+- motorConstant < 0：推力沿 link 局部 -Z 轴（向下，下降电机）
 
 #### 2.1 螺旋桨Link（含 motorConstant 配置）
 
 ```xml
+<!-- 上升电机 rotor_0 (左前) 示例 -->
 <link name='rotor_0'>
-  <pose>11.225 -2.894 0.331 0 0 0</pose>       <!-- 电机安装位置, 推力施加点 -->
+  <pose>7.557 6.338 -0.584 0 0 0</pose>       <!-- 电机安装位置, 推力施加点 -->
   <gravity>false</gravity>
   <mass>1e-8</mass>
   <inertia>...</inertia>
   <visual name='rotor_0_visual'>
-    <pose>-11.225 2.894 -0.331 0 0 0</pose>    <!-- 补偿link pose, 使STL回到绝对坐标位置 -->
+    <pose>-7.557 -6.338 0.584 0 0 0</pose>    <!-- 补偿link pose, 使STL回到相对主体中心位置 -->
     <geometry>
       <mesh>
         <scale>1 1 1</scale>
-        <uri>file://.../lingyun01_lift_motor_front1.STL</uri>
+        <uri>file://.../meshes/V2_FLU/lift_up_lf.STL</uri>
       </mesh>
     </geometry>
   </visual>
   <collision name='rotor_0_collision'>
-    <pose>-11.225 2.894 -0.331 0 0 0</pose>    <!-- 同visual, 碰撞体也在正确位置 -->
+    <pose>-7.557 -6.338 0.584 0 0 0</pose>    <!-- 同visual, 碰撞体也在正确位置 -->
     <geometry>
       <cylinder>
         <radius>0.8</radius>
@@ -523,27 +525,30 @@ Gazebo 计算力矩时：`力矩 = (推力作用点 - 重心) × 推力方向`�
 </link>
 ```
 
-#### 2.2 升力电机 motorConstant 配置（推力方向控制）
+#### 2.2 升力电机 motorConstant 配置（V2: 上升0-3 + 下降4-5）
 
-新方案通过 motorConstant 符号控制推力方向，无需 tilt 舵机翻转：
+新方案通过 motorConstant 符号控制推力方向，无需 tilt 舵机翻转（T-MOTOR A10, 最大推力 222.5N）：
 
 | 电机编号 | Link名称 | motorConstant | 推力方向 | 功能 |
 |---------|---------|---------------|---------|------|
-| 0 | rotor_0 | **+1.416e-03** | +Z（向上） | 上升（20kg级） |
-| 1 | rotor_1 | **-2.832e-03** | -Z（向下） | 下降（40kg级） |
-| 2 | rotor_2 | **-2.832e-03** | -Z（向下） | 下降（40kg级） |
-| 3 | rotor_3 | **+1.416e-03** | +Z（向上） | 上升（20kg级） |
+| 0 | rotor_0 (左前) | **+1.608e-03** | +Z（向上） | 上升电机 (ccw) |
+| 1 | rotor_1 (右前) | **+1.608e-03** | +Z（向上） | 上升电机 (cw) |
+| 2 | rotor_2 (左后) | **+1.608e-03** | +Z（向上） | 上升电机 (cw) |
+| 3 | rotor_3 (右后) | **+1.608e-03** | +Z（向上） | 上升电机 (ccw) |
+| 4 | rotor_4 (前) | **-1.608e-03** | -Z（向下） | 下降电机 (cw) |
+| 5 | rotor_5 (后) | **-1.608e-03** | -Z（向下） | 下降电机 (ccw) |
 
 **特点**:
-- **Link pose**: (11.225, -2.894, 0.331) - **电机安装位置**，物理推力施加点
-- **Visual/Collision pose**: (-11.225, 2.894, -0.331) - **反向补偿link pose**，使STL绝对坐标顶点回到正确位置
+- **Link pose**: (7.557, 6.338, -0.584) - **电机安装位置**，物理推力施加点（上升电机左前示例）
+- **Visual/Collision pose**: (-7.557, -6.338, 0.584) - **反向补偿link pose**，使 STL 回到相对主体中心位置
 - **质量**: 1e-8 kg（仅螺旋桨，虚拟质量）
 - **碰撞体**: 简化为圆柱体（radius=0.8m, length=0.05m）
-- **推力方向**: 由 motorConstant 符号控制，正值向上（上升），负值向下（下降）
+- **推力方向**: 由 motorConstant 符号控制，正值向上（上升0-3），负值向下（下降4-5）
+- **maxRotVelocity**: 372.0（A10, 与 SIM_GZ_EC 的 DIS=372 对应）
 
 **重要：为什么rotor的link pose必须设为电机安装位置？**
 
-MulticopterMotorModel插件在rotor的link帧原点施加推力。如果rotor的link pose为(0,0,0)（模型原点），推力施加点偏离电机安装位置约11.5m，会产生巨大的俯仰力矩：
+MulticopterMotorModel插件在rotor的link帧原点施加推力。如果rotor的link pose为(0,0,0)（模型原点），推力施加点偏离电机安装位置约9.9m，会产生巨大的俯仰力矩：
 - 前部电机(X>0)：推力对重心产生抬头/低头力矩（取决于推力方向）
 - 后部电机(X<0)：推力对重心产生相反方向的俯仰力矩
 
@@ -551,16 +556,16 @@ MulticopterMotorModel插件在rotor的link帧原点施加推力。如果rotor的
 
 **抬头力矩抑制机制（新方案）**：
 
-推进电机在重心下方1.5m，推力向前会产生抬头力矩。新方案通过**升力电机推力差动分配**抑制抬头力矩（不再使用 tilt 舵机）：
-- 抬头时：前组上升电机(M0)/下降电机(M1)增强，后组下降电机(M2)/上升电机(M3)减弱
+推进电机在重心下方0.878m，推力向前会产生抬头力矩。新方案通过**升力电机推力差动分配**抑制抬头力矩（不再使用 tilt 舵机）：
+- 抬头时：前组上升电机(0,1)增强，后组上升电机(2,3)减弱（下降电机前后差动协同）
 - 低头时：后组增强，前组减弱
 - 控制分配器（ActuatorEffectivenessCustom）自动计算各电机推力分配
 
 ---
 
-### 3️⃣ 推进电机配置（以rotor_4为例）
+### 3️⃣ 推进电机配置（V2, 以rotor_6为例）
 
-推进电机采用**单Link结构**，STL文件使用SW导出的绝对坐标（与飞艇主体同一原点）
+推进电机（rotor_6~9, 四角布局）采用**单Link结构**，STL文件使用 V2_FLU 预转换的相对主体中心坐标（FLU米制）
 
 **与升力电机同样的问题**：推进电机rotor的link pose也必须设为安装位置（物理推力施加点），否则推力施加在模型原点(0,0,0)，会产生巨大的偏航和俯仰力矩，导致飞艇乱跑。
 
@@ -569,7 +574,7 @@ MulticopterMotorModel插件在rotor的link帧原点施加推力。如果rotor的
 MulticopterMotorModel插件始终沿link的局部**+Z轴**施加推力。要使推进电机推力沿+X方向（向前），需要让rotor link的局部Z轴指向base_link的+X方向。方法是在link pose中绕Y轴旋转+90度。
 
 ```
-base_link坐标系:        rotor_4 link坐标系(绕Y轴+90度后):
+base_link坐标系:        rotor_6 link坐标系(绕Y轴+90度后):
   Z(上)                    X(前, 原Z方向)
   |                        |
   |                        |
@@ -582,22 +587,22 @@ Y(左)
 ```
 
 ```xml
-<link name='rotor_4'>
-  <pose>2.55 2.39 -1.51 0 1.5708 0</pose>       <!-- 绕Y轴+90度, 使link Z轴指向前方(+X) -->
+<link name='rotor_6'>
+  <pose>2.230 5.888 -2.378 0 1.5708 0</pose>    <!-- 绕Y轴+90度, 使link Z轴指向前方(+X) -->
   <gravity>false</gravity>
   <mass>1e-8</mass>
   <inertial>...</inertial>
-  <visual name='rotor_4_visual'>
-    <pose>-1.51 -2.39 -2.55 0 -1.5708 0</pose>  <!-- 补偿link旋转, 使mesh位置正确 -->
+  <visual name='rotor_6_visual'>
+    <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>  <!-- 补偿link旋转, 使mesh位置正确 -->
     <geometry>
       <mesh>
         <scale>1 1 1</scale>
-        <uri>file://.../lingyun01_thrust_motor_LF.STL</uri>
+        <uri>file://.../meshes/V2_FLU/thrust_lf.STL</uri>
       </mesh>
     </geometry>
   </visual>
-  <collision name='rotor_4_collision'>
-    <pose>-1.51 -2.39 -2.55 0 -1.5708 0</pose>  <!-- 同visual -->
+  <collision name='rotor_6_collision'>
+    <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>  <!-- 同visual -->
     <geometry>
       <cylinder>
         <radius>1.0</radius>
@@ -606,10 +611,10 @@ Y(左)
     </geometry>
   </collision>
 </link>
-<joint name='rotor_4_joint' type='revolute'>
+<joint name='rotor_6_joint' type='revolute'>
   <!-- 无pose旋转, 旋转已放在link pose中 -->
   <parent>base_link</parent>
-  <child>rotor_4</child>
+  <child>rotor_6</child>
   <axis>
     <xyz>0 0 1</xyz>                             <!-- link局部Z轴, 经旋转后=base_link X轴 -->
     <limit>
@@ -625,11 +630,13 @@ Y(左)
 ```
 
 **特点**:
-- **Link pose**: (2.55, 2.39, -1.51, 0, 1.5708, 0) - 安装位置 + 绕Y轴+90度旋转，使link的Z轴指向+X方向
-- **Visual/Collision pose**: (-1.51, -2.39, -2.55, 0, -1.5708, 0) - 补偿link旋转，使STL mesh在世界坐标系中位置正确
+- **Link pose**: (2.230, 5.888, -2.378, 0, 1.5708, 0) - 安装位置 + 绕Y轴+90度旋转，使link的Z轴指向+X方向
+- **Visual/Collision pose**: (-2.378, -5.888, -2.230, 0, -1.5708, 0) - 补偿link旋转，使STL mesh在世界坐标系中位置正确
 - **Joint pose**: 无旋转（旋转已放在link pose中）
 - **Axis**: (0, 0, 1) - link局部Z轴，由于link旋转90度，实际旋转轴在base_link中是+X方向
 - **spring_stiffness**: 必须为0，之前遗留值5000会导致电机被弹簧力卡死
+- **motorConstant**: +8.677e-03（HOBBYWING P65M, 最大推力 1352.4N），maxRotVelocity=394.8
+- **旋转方向**: 左侧(6,8) CW, 右侧(7,9) CCW（左右对转, 滚转反扭矩抵消）
 
 **Visual/Collision pose补偿计算**：
 
@@ -638,18 +645,18 @@ Y(左)
 ```
 补偿公式: visual_pose = R_y(-pi/2) * [原visual平移] + R_y(-pi/2)
 
-以rotor_4为例:
-  原visual平移 = [-2.55, -2.39, 1.51]
-  R_y(-pi/2) * [-2.55, -2.39, 1.51] = [-1.51, -2.39, -2.55]
+以rotor_6为例:
+  原visual平移 = [-2.230, -5.888, 2.378]
+  R_y(-pi/2) * [-2.230, -5.888, 2.378] = [-2.378, -5.888, -2.230]
   再加上反向旋转: pitch = -1.5708
-  最终: (-1.51, -2.39, -2.55, 0, -1.5708, 0)
+  最终: (-2.378, -5.888, -2.230, 0, -1.5708, 0)
 ```
 
 **重要：为什么推进电机的link pose也必须设为安装位置？**
 
-与升力电机同理，MulticopterMotorModel插件在rotor的link帧原点施加推力。如果link pose为(0,0,0)（模型原点），推力施加点偏离电机安装位置约2.5m，会产生巨大的偏航和俯仰力矩：
+与升力电机同理，MulticopterMotorModel插件在rotor的link帧原点施加推力。如果link pose为(0,0,0)（模型原点），推力施加点偏离电机安装位置约6.7m，会产生巨大的偏航和俯仰力矩：
 - 推力在模型原点施加，对重心产生偏航力矩（左右电机不对称）
-- 推力在模型原点施加，对重心产生俯仰力矩（推进电机在重心下方1.5m）
+- 推力在模型原点施加，对重心产生俯仰力矩（推进电机在重心下方0.878m）
 - 结果：飞艇乱跑，绕大圈转
 
 修复后rotor link pose = 安装位置，推力施加点与电机位置重合，力臂正确。
@@ -690,10 +697,10 @@ Y(左)
 
 | 参数 | 说明 | 典型值 |
 |------|------|--------|
-| name | Joint名称 | rotor_0_joint, rotor_4_joint |
+| name | Joint名称 | rotor_0_joint, rotor_6_joint |
 | type | Joint类型 | revolute(旋转), prismatic(滑动), fixed(固定) |
 | parent | 父Link | base_link |
-| child | 子Link | rotor_0, rotor_4 |
+| child | 子Link | rotor_0, rotor_6 |
 | axis/xyz | 旋转轴方向 | (0,0,1)绕Z轴, (1,0,0)绕X轴 |
 | limit/lower | 最小角度限制 | 弧度值 |
 | limit/upper | 最大角度限制 | 弧度值 |
@@ -702,9 +709,9 @@ Y(左)
 
 ---
 
-### 2️⃣ 升力电机Joint（单关节结构）
+### 2️⃣ 上升/下降电机Joint（单关节结构）
 
-新方案下升力电机采用**单关节结构**：rotor_0~3 直接通过 rotor_joint 连接 base_link，**无 tilt 倾斜关节**。推力方向由 motorConstant 符号控制，无需机械翻转。
+新方案下上升/下降电机采用**单关节结构**：rotor_0~5 直接通过 rotor_joint 连接 base_link，**无 tilt 倾斜关节**。推力方向由 motorConstant 符号控制，无需机械翻转。
 
 #### 2.1 旋转关节（rotor_0_joint）
 
@@ -752,10 +759,10 @@ Y(左)
 
 ```xml
 <!-- 推进电机旋转关节 -->
-<joint name='rotor_4_joint' type='revolute'>
+<joint name='rotor_6_joint' type='revolute'>
   <!-- 无pose旋转, 旋转已放在link pose中 -->
   <parent>base_link</parent>
-  <child>rotor_4</child>
+  <child>rotor_6</child>
   <axis>
     <xyz>0 0 1</xyz>                             <!-- link局部Z轴, 经旋转后=base_link X轴 -->
     <limit>
@@ -781,53 +788,65 @@ Y(左)
 
 ---
 
-## 📊 升力电机 vs 推进电机 对比
+## 📊 上升/下降/推进电机 对比（V2）
 
-| 特性 | 升力电机 (rotor_0~3) | 推进电机 (rotor_4~7) |
-|------|---------------------|---------------------|
-| **Link数量** | 1个（仅螺旋桨） | 1个（仅螺旋桨） |
-| **父子链** | base -> rotor | base -> rotor |
-| **控制功能** | 升力（上升/下降）+ 俯仰差动 | 推力（水平前进）+ 偏航差动 |
-| **倾斜关节** | 无（新方案已移除 tilt 舵机） | 无 |
-| **旋转轴** | rotor_joint绕Z轴(局部) | rotor_joint绕Z轴(局部), link旋转后=base_link X轴 |
-| **推力方向** | motorConstant符号控制（+向上/-向下） | +X(向前, link旋转后) |
-| **Link pose旋转** | 无 | 绕Y轴+90度 |
-| **推力方向控制** | motorConstant 符号（+1.416e-03/-2.832e-03） | 固定（link pose旋转90度） |
-| **典型应用** | 垂直升力、俯仰姿态控制、抬头力矩抑制 | 水平推进、偏航控制 |
+| 特性 | 上升电机 (rotor_0~3) | 下降电机 (rotor_4~5) | 推进电机 (rotor_6~9) |
+|------|---------------------|---------------------|---------------------|
+| **Link数量** | 1个（仅螺旋桨） | 1个（仅螺旋桨） | 1个（仅螺旋桨） |
+| **父子链** | base -> rotor | base -> rotor | base -> rotor |
+| **控制功能** | 上升 + 俯仰差动 + 横滚差动 | 下降 + 俯仰差动 | 水平推进 + 偏航差动 |
+| **倾斜关节** | 无（V2已移除 tilt 舵机） | 无 | 无 |
+| **旋转轴** | rotor_joint绕Z轴(局部) | rotor_joint绕Z轴(局部) | rotor_joint绕Z轴(局部), link旋转后=base_link X轴 |
+| **推力方向** | motorConstant符号（+向上） | motorConstant符号（-向下） | +X(向前, link旋转后) |
+| **Link pose旋转** | 无 | 无 | 绕Y轴+90度 |
+| **推力方向控制** | motorConstant +1.608e-03 | motorConstant -1.608e-03 | 固定（link pose旋转90度）+8.677e-03 |
+| **典型应用** | 垂直上升、俯仰/横滚姿态控制 | 垂直下降、俯仰控制 | 水平推进、偏航控制 |
 
 ---
 
-## 📋 电机布局位置表
+## 📋 电机布局位置表（V2, FLU坐标）
 
-### 升力电机（X轴线性排列）
+### 上升电机（四角布局, 推力向上）
 
-| 电机编号 | Link名称 | motorConstant | STL绝对坐标中心(X,Y,Z) | 位置描述 |
+| 电机编号 | Link名称 | motorConstant | FLU坐标中心(X,Y,Z) | 位置描述 |
 |---------|---------|---------------|----------------------|---------|
-| 0 | rotor_0 | +1.416e-03（向上） | (+11.225, -2.894, +0.331) | 前部电机1 (最前) |
-| 1 | rotor_1 | -2.832e-03（向下） | (+9.215, -2.894, +0.331) | 前部电机2 |
-| 2 | rotor_2 | -2.832e-03（向下） | (-13.535, -2.894, +0.331) | 后部电机1 |
-| 3 | rotor_3 | +1.416e-03（向上） | (-15.525, -2.894, +0.331) | 后部电机2 (最后) |
+| 0 | rotor_0 | +1.608e-03（向上） | (+7.557, +6.338, -0.584) | 左前 (ccw) |
+| 1 | rotor_1 | +1.608e-03（向上） | (+7.557, -6.337, -0.584) | 右前 (cw) |
+| 2 | rotor_2 | +1.608e-03（向上） | (-9.843, +5.814, -0.584) | 左后 (cw) |
+| 3 | rotor_3 | +1.608e-03（向上） | (-9.843, -5.812, -0.584) | 右后 (ccw) |
 
 **特点**:
-- Y坐标统一: 全部在Y=-2.894m
-- Z坐标统一: 全部在Z=+0.331m
-- X轴分布: 前部电机(+9~+11m)，后部电机(-15~-14m)
-- **推力方向**: 由 motorConstant 符号控制，M0/M3 向上（上升），M1/M2 向下（下降）
-- STL文件使用绝对坐标，rotor link pose = 电机安装位置（物理正确），visual/collision pose = 负偏移（补偿STL绝对坐标）
+- 四角布局: 前组(0,1) X=+7.557, 后组(2,3) X=-9.843
+- 左右对称: 左组(0,2) Y=+6.3m, 右组(1,3) Y=-6.3m, 横滚力臂 PY≈6.34m
+- **推力方向**: motorConstant 正值, 推力向上（上升）
+- **横滚控制**: 左组(0,2) vs 右组(1,3) 差动产生横滚力矩
+- STL使用FLU相对主体中心坐标，rotor link pose = 电机安装位置（物理正确），visual/collision pose = 负偏移
 
-### 推进电机（X-Y平面分布）
+### 下降电机（中轴前后, 推力向下）
+
+| 电机编号 | Link名称 | motorConstant | FLU坐标中心(X,Y,Z) | 位置描述 |
+|---------|---------|---------------|----------------------|---------|
+| 4 | rotor_4 | -1.608e-03（向下） | (+6.957, +0.017, +0.505) | 前 (cw) |
+| 5 | rotor_5 | -1.608e-03（向下） | (-11.443, +0.017, +0.505) | 后 (ccw) |
+
+**特点**:
+- 中轴前后: 前(4) X=+6.957, 后(5) X=-11.443, Y≈0
+- **推力方向**: motorConstant 负值, 推力向下（下降）
+- 下降电机参与俯仰差动（前降低头/后降抬头）
+
+### 推进电机（四角布局, 推力向前）
 
 | 电机编号 | Link名称 | Link pose (x y z roll pitch yaw) | visual/collision pose | 位置描述 |
 |---------|---------|--------------------------------|----------------------|---------|
-| 4 | rotor_4 | (2.55, 2.39, -1.51, 0, 1.5708, 0) | (-1.51, -2.39, -2.55, 0, -1.5708, 0) | 左前 |
-| 5 | rotor_5 | (-2.55, 2.39, -1.51, 0, 1.5708, 0) | (-1.51, -2.39, 2.55, 0, -1.5708, 0) | 左后 |
-| 6 | rotor_6 | (2.55, -8.19, -1.51, 0, 1.5708, 0) | (-1.51, 8.19, -2.55, 0, -1.5708, 0) | 右前 |
-| 7 | rotor_7 | (-2.55, -8.19, -1.51, 0, 1.5708, 0) | (-1.51, 8.19, 2.55, 0, -1.5708, 0) | 右后 |
+| 6 | rotor_6 | (2.230, 5.888, -2.378, 0, 1.5708, 0) | (-2.378, -5.888, -2.230, 0, -1.5708, 0) | 左前 (cw) |
+| 7 | rotor_7 | (2.230, -5.887, -2.378, 0, 1.5708, 0) | (-2.378, 5.887, -2.230, 0, -1.5708, 0) | 右前 (ccw) |
+| 8 | rotor_8 | (-2.971, 5.888, -2.378, 0, 1.5708, 0) | (-2.378, -5.888, 2.971, 0, -1.5708, 0) | 左后 (cw) |
+| 9 | rotor_9 | (-2.972, -5.887, -2.378, 0, 1.5708, 0) | (-2.378, 5.887, 2.972, 0, -1.5708, 0) | 右后 (ccw) |
 
 **特点**:
-- Z坐标统一: 全部在Z=-1.51m（重心下方约1.5m）
-- 左右对称: 左(Y=+2.39m)右(Y=-8.19m)
-- 前后对称: 前(X=+2.55m)后(X=-2.55m)
+- Z坐标统一: 全部在Z=-2.378m（重心(0,0,-1.5)下方约0.878m）
+- 左右对称: 左(Y=+5.888m)右(Y=-5.887m), 左右对转反扭矩抵消
+- 前后: 前(X=+2.230m)后(X=-2.971/-2.972m)
 - Link pose统一绕Y轴+90度: 使link局部Z轴指向base_link +X方向(推力向前)
 - visual/collision pose补偿link旋转: 使STL mesh在世界坐标系中位置正确
 - 推力方向: 始终沿+X方向（向前），固定不变
@@ -848,11 +867,11 @@ Y(左)
 </joint>
 
 <link name='rotor_0'>
-  <pose>11.225 -2.894 0.331 0 0 0</pose>
+  <pose>7.557 6.338 -0.584 0 0 0</pose>
 </link>
 
 <!-- Joint位置 = 子Link的pose前3个参数 -->
-<!-- Joint位置 = (11.225, -2.894, 0.331) -->
+<!-- Joint位置 = (7.557, 6.338, -0.584) -->
 ```
 
 ### ✅ 隐式定义（当前配置）
@@ -871,7 +890,7 @@ Y(左)
 
 ```xml
 <joint>
-  <pose>11.225 -2.894 0.331 0 0 0</pose>
+  <pose>7.557 6.338 -0.584 0 0 0</pose>
   <parent>base_link</parent>
   <child>rotor_0</child>
 </joint>
@@ -884,25 +903,25 @@ Y(左)
 
 ## 🔧 配置示例：推进电机
 
-### 当前配置（方式A: rc_cessna风格）
+### 当前配置（方式A: rc_cessna风格, V2 推进电机）
 
-推进电机STL文件使用SW导出的绝对坐标，与升力电机相同，link pose必须设为安装位置：
+推进电机（rotor_6~9）STL文件使用 V2_FLU 预转换的相对主体中心坐标（FLU米制），link pose必须设为安装位置：
 
 ```xml
-<link name='rotor_4'>
-  <pose>2.55 2.39 -1.51 0 1.5708 0</pose>       <!-- 绕Y轴+90度, 使link Z轴指向前方(+X) -->
-  <visual name='rotor_4_visual'>
-    <pose>-1.51 -2.39 -2.55 0 -1.5708 0</pose>  <!-- 补偿link旋转, 使mesh位置正确 -->
+<link name='rotor_6'>
+  <pose>2.230 5.888 -2.378 0 1.5708 0</pose>    <!-- 绕Y轴+90度, 使link Z轴指向前方(+X) -->
+  <visual name='rotor_6_visual'>
+    <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>  <!-- 补偿link旋转, 使mesh位置正确 -->
   </visual>
-  <collision name='rotor_4_collision'>
-    <pose>-1.51 -2.39 -2.55 0 -1.5708 0</pose>
+  <collision name='rotor_6_collision'>
+    <pose>-2.378 -5.888 -2.230 0 -1.5708 0</pose>
   </collision>
 </link>
 
-<joint name='rotor_4_joint' type='revolute'>
+<joint name='rotor_6_joint' type='revolute'>
   <!-- 无pose旋转, 旋转已放在link pose中 -->
   <parent>base_link</parent>
-  <child>rotor_4</child>
+  <child>rotor_6</child>
   <axis>
     <xyz>0 0 1</xyz>                             <!-- link局部Z轴, 经旋转后=base_link X轴 -->
     <dynamics>
@@ -932,36 +951,37 @@ Y(左)
 ### 质量分布
 
 - base_link质量很大(2206kg, 仿真占位值;设计起飞重量仍在核算中, 暂以此值保持中性浮力)，代表飞艇气囊
-- rotor质量很小(0.001kg)，仅代表螺旋桨（新方案：无 tilt_motor 支架）
+- rotor质量很小(1e-8kg)，仅代表螺旋桨（V2方案：无 tilt_motor 支架）
 
 ### 引力设置
 
-- 所有Link的gravity设置为false
+- **base_link 的 gravity=true**：受重力作用，由 AirshipDynamics 浮力插件施加浮力与之平衡（净浮力=0）
+- **所有电机/风机/阀门 Link 的 gravity=false**：仅可视化占位，不参与重力计算
 - 飞艇依靠气囊浮力悬浮，而非螺旋桨升力平衡重力
 
 ### STL文件说明
 
-- **所有STL文件均使用SW导出的绝对坐标**（与飞艇主体同一原点）
-- 升力电机STL已从source_backup恢复为原始绝对坐标版本
-- 推进电机STL本身就是绝对坐标
-- **升力电机(rotor_0~3)**：link pose = 电机安装位置（物理正确），visual/collision pose = 负偏移（补偿STL绝对坐标），推力方向由 motorConstant 符号控制
-- **推进电机(rotor_4~7)**：link pose = 安装位置（物理推力点），visual/collision pose = 负偏移（补偿STL绝对坐标）
+- **V2 所有 STL 均使用 FLU 相对主体中心坐标**（`meshes/V2_FLU/`，由 SW 毫米坐标经 `convert_stl_to_flu.py` 预转换，主体中心在原点）
+- **上升电机(rotor_0~3)**：link pose = 电机安装位置（物理正确），visual/collision pose = 负偏移（补偿STL相对主体中心），推力方向由 motorConstant 正号控制（+1.608e-03，向上）
+- **下降电机(rotor_4~5)**：同上升电机，motorConstant 负号控制（-1.608e-03，向下）
+- **推进电机(rotor_6~9)**：link pose = 安装位置（物理推力点，绕Y轴+90度），visual/collision pose = 负偏移（补偿link旋转）
 - **所有电机的rotor link pose都必须设为物理安装位置**，否则推力施加在模型原点(0,0,0)，产生巨大的错误力矩
 
 ### 推力方向与力矩分析
 
-新方案下升力电机推力方向**固定**，由 motorConstant 符号控制（无 tilt 舵机翻转）：
+V2 方案下升力类电机推力方向**固定**，由 motorConstant 符号控制（无 tilt 舵机翻转）：
 
 | 电机类型 | 推力方向 | 俯仰力矩 | 偏航力矩 | 推力方向控制方式 |
 |---------|---------|---------|---------|-------------------|
-| 升力电机 M0/M3 (motorConstant>0) | +Z（向上，上升） | 前部M0增大->抬头, 后部M3增大->低头 | 无（反扭矩抵消） | motorConstant 正值，固定向上 |
-| 升力电机 M1/M2 (motorConstant<0) | -Z（向下，下降） | 前部M1增大->低头, 后部M2增大->抬头 | 无（反扭矩抵消） | motorConstant 负值，固定向下 |
-| 推进电机(4-7) | +X(向前) | 向前推->抬头(电机在重心下方1.5m) | 左侧推->左转, 右侧推->右转 | link pose绕Y轴+90度，固定向前 |
+| 上升电机 0-3 (motorConstant>0) | +Z（向上，上升） | 前组(0,1)增大->抬头, 后组(2,3)增大->低头 | 无（对角反扭矩抵消） | motorConstant 正值，固定向上 |
+| 下降电机 4-5 (motorConstant<0) | -Z（向下，下降） | 前(4)增大->低头, 后(5)增大->抬头 | 无（前后反扭矩抵消） | motorConstant 负值，固定向下 |
+| 推进电机 6-9 | +X(向前) | 向前推->抬头(电机在重心下方0.878m) | 左侧推->左转, 右侧推->右转 | link pose绕Y轴+90度，固定向前 |
 
 **关键结论**：
-- 升力电机推力方向**固定**，由 motorConstant 符号控制（正值向上，负值向下），无需 tilt 舵机翻转
-- 俯仰控制通过升力电机推力差动分配实现：前组(M0/M1)增强抬头，后组(M2/M3)增强低头
-- 推进电机推力方向始终水平向前，推进-俯仰耦合方向固定不变
+- 上升/下降电机推力方向**固定**，由 motorConstant 符号控制（正值向上，负值向下），无需 tilt 舵机翻转
+- 俯仰控制通过升力类电机推力差动分配实现：前组(0,1)增强抬头，后组(2,3)增强低头（下降电机4-5前后差动协同）
+- 横滚控制通过上升电机左右差动实现：左组(0,2) vs 右组(1,3)，力臂 PY≈6.34m（气囊不参与横滚）
+- 推进电机推力方向始终水平向前，推进-俯仰耦合方向固定不变（由 ActuatorEffectivenessCustom 补偿）
 - 抬头力矩抑制通过升力电机推力差动分配（不再使用 tilt 舵机）
 
 ---
@@ -988,18 +1008,19 @@ F_net = buoyancy - (m_base + m_ballast_total) × g
 - 4气囊总质量 m_ballast_total 增大 → 净浮力减小 → 下沉
 - 4气囊总质量 m_ballast_total 减小 → 净浮力增大 → 上升
 
-### 四气囊布局
+### 四气囊布局（V2）
 
 | 索引 | 名称 | Y坐标(m) | 相对重心Y(m) | 位置 |
 |------|------|---------|-------------|------|
-| 0 | LI (左内) | -0.5815 | +2.3125 | 左侧内侧 |
-| 1 | LO (左外) | +4.0435 | +6.9375 | 左侧外侧 |
-| 2 | RI (右内) | -5.2065 | -2.3125 | 右侧内侧 |
-| 3 | RO (右外) | -9.8315 | -6.9375 | 右侧外侧 |
+| 0 | LI (左内主囊) | +3.3 | +3.3 | 左侧内侧 |
+| 1 | LO (左外副囊) | +8.6 | +8.6 | 左侧外侧 |
+| 2 | RI (右内主囊) | -3.3 | -3.3 | 右侧内侧 |
+| 3 | RO (右外副囊) | -8.6 | -8.6 | 右侧外侧 |
 
-**重心Y坐标**: -2.894m (inertial pose)
+**重心Y坐标**: 0m (inertial pose (0,0,-1.5), V2)
 
 > 注: 四气囊不再按左右差动分配质量,而是完全同步充放气(共用同一质量)。上表仅为物理安装位置参考。
+> V1历史: 旧气囊布局(基于旧重心Y=-2.894)的数值已废弃。
 
 ### 空气囊参数
 
@@ -1009,7 +1030,7 @@ F_net = buoyancy - (m_base + m_ballast_total) × g
 | 最大表压 | 5 kPa | 结构极限 |
 | 最大空气质量 | 128.5 kg | 5kPa表压下 |
 | 风机流量 | 0.102 kg/s | 充气/抽气同款 |
-| 执行器 | 4囊同步 | 每囊2风机+2阀门, 同步驱动 |
+| 执行器 | 4囊同步 | 每囊1风机+1阀门, 共4风机+4阀门 |
 
 ### 数据流架构
 
@@ -1044,16 +1065,14 @@ Gazebo物理引擎 (应用垂直力到base_link)
 
 ### 执行器状态位图
 
-每个空气囊的执行器状态编码为4位位图,4囊完全同步动作:
+每个空气囊的执行器状态编码为2位位图（V2: 每囊1风机+1阀门）,4囊完全同步动作:
 
 | Bit | 执行器 | 功能 |
 |-----|--------|------|
-| 0 | blower_in | 充气风机 (增重) |
-| 1 | blower_out | 抽气风机 (减重) |
-| 2 | valve_in | 充气阀门 (配合充气风机) |
-| 3 | valve_out | 放气阀门 (配合抽气风机) |
+| 0 | blower | 充气风机 (增重, 配合阀门鼓风) |
+| 1 | valve | 排气阀门 (开=自然排气减重) |
 
-**互锁保护**: 充气阀和放气阀禁止同时打开 (代码实现)
+**互锁保护**: 充气和排气禁止同时进行 (代码实现)
 **同步策略**: 4个气囊执行同一套充放气命令(完全相同), 不做左右差动
 
 ### AirshipDynamics 插件 SDF 参数
@@ -1111,6 +1130,16 @@ AirshipDynamics 插件支持以下浮力调节相关 SDF 参数 (可在 model.sd
 **维护者**: 灵云01项目组
 
 **版本历史**:
+- v2.4 (2026-08-18):
+  - **清理文档中V1旧数值, 全部更新为V2 10电机新布局**
+  - 重心从旧值(-0.012,-2.894,-0.009)更新为V2的(0,0,-1.5)
+  - 电机布局从V1(升力0-3 X轴线性 + 推进4-7)更新为V2(上升0-3四角 + 下降4-5中轴 + 推进6-9四角)
+  - 电机坐标/motorConstant更新为V2实际值(+1.608e-03/-1.608e-03/+8.677e-03)
+  - Link数量从9个更新为19个(V2: 含下降电机与风机/阀门占位)
+  - STL说明更新为 V2_FLU 预转换(FLU相对主体中心), 替换旧的SW绝对坐标描述
+  - 推进电机示例从rotor_4更新为rotor_6, 耦合力臂从1.5m更新为0.878m(CA_AS_PZ_PROP)
+  - 四气囊布局更新为V2(主囊±3.3, 副囊±8.6), 执行器位图更新为每囊1风机1阀门
+  - 保留全部V2演进说明(取消四气囊横滚、移除tilt舵机)
 - v2.3 (2026-08-12):
   - **重大架构变更: 取消四气囊横滚控制, 改为统一浮力调节**
   - 四气囊不再做左右差动横滚调节, 改为完全同步充放气用于调节高度
