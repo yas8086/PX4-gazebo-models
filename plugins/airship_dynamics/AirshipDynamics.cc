@@ -3,6 +3,7 @@
 #include <string>
 #include <cmath>
 #include <limits>
+#include <cstdio>
 
 
 #include <gz/plugin/Register.hh>
@@ -99,6 +100,15 @@ public:
 
   // 单气囊最大质量 (kg)
   double ballastMassMax{128.5};
+
+  // === P3c: 动态惯量 (气囊质量计入 base_link Inertial) ===
+  // 原始 base_link 质量/惯量 (Configure时从Inertial读取, 不随气囊变化)
+  double baseMass{0.0};
+  double baseIxx{0.0};
+  double baseIyy{0.0};
+  double baseIzz{0.0};
+  // 上一次设置的动态质量 (避免每帧重复SetComponentData)
+  double lastSetMass{-1.0};
 
   void UpdateWind(const msgs::Vector3d &_msg)
   {
@@ -241,10 +251,18 @@ void AirshipDynamics::Configure(
     this->dataPtr->tetherAnchor = anchorVec;
   }
 
+  // 附加质量矩阵映射 (Kirchhoff方程命名约定):
+  //   m11/m22/m33 = 线性附加质量 (X/Y/Z方向) -> M11对角 (力矩阵)
+  //   m44/m55/m66 = 附加转动惯量 (roll/pitch/yaw轴) -> M22对角 (力矩矩阵)
+  //   m26/m35/m53/m62 = 线性-角速度耦合项 -> M12/M21
+  // V2修复: 原实现将m22(Y向线性附加质量1496)误写入m22(1,1)(力矩矩阵),
+  // 随即被m55=5000覆盖 -> M11(1,1)=0, Y向线性附加质量丢失,
+  // 导致横滚Munk力矩符号反转(-787*vy*vz, 正确应为+709*vy*vz),
+  // 快速爬升+侧漂时产生数千N·m的反向横滚力矩(起飞倾斜失控根因之一).
   if (_sdf->HasElement("m11"))
     this->dataPtr->m11(0, 0) = _sdf->Get<double>("m11");
   if (_sdf->HasElement("m22"))
-    this->dataPtr->m22(1, 1) = _sdf->Get<double>("m22");
+    this->dataPtr->m11(1, 1) = _sdf->Get<double>("m22");
   if (_sdf->HasElement("m26"))
     this->dataPtr->m12(1, 2) = _sdf->Get<double>("m26");
   if (_sdf->HasElement("m33"))
@@ -324,6 +342,17 @@ void AirshipDynamics::Configure(
   auto baseLinkInertial = _ecm.Component<components::Inertial>(this->dataPtr->linkEntity);
   if (baseLinkInertial)
     mass = baseLinkInertial->Data().MassMatrix().Mass();
+
+  // P3c: 保存原始 base_link 质量/惯量 (气囊质量动态计入)
+  // 在Configure时从Inertial读取, 作为动态惯量更新的基准(不随气囊变化)
+  if (baseLinkInertial) {
+    auto baseMM = baseLinkInertial->Data().MassMatrix();
+    this->dataPtr->baseMass = baseMM.Mass();
+    this->dataPtr->baseIxx = baseMM.Ixx();
+    this->dataPtr->baseIyy = baseMM.Iyy();
+    this->dataPtr->baseIzz = baseMM.Izz();
+    this->dataPtr->lastSetMass = this->dataPtr->baseMass;
+  }
 
   // 遍历模型的所有link, 累加质量
   double totalMass = mass;
@@ -443,9 +472,12 @@ void AirshipDynamics::PreUpdate(
   {
     std::lock_guard<std::mutex> lock(this->dataPtr->mtx);
     if (this->dataPtr->netBuoyancyCmdValid) {
-      // 动态浮力: effectiveVolume = hullVolume + netBuoyancyCmd / (rho * g)
+      // 动态浮力: effectiveVolume = hullVolume + (netBuoyancy + netBuoyancyCmd) / (rho * g)
+      // V2修复: 静态 netBuoyancy(model.sdf, 基准微调补偿)必须与动态 netBuoyancyCmd 叠加,
+      // 否则 ballast_control 周期发布 net_buoyancy 会完全覆盖静态参数(补偿失效)
       currentEffectiveVolume = this->dataPtr->hullVolume +
-          this->dataPtr->netBuoyancyCmd / (this->dataPtr->airDensity * gravity.Length());
+          (this->dataPtr->netBuoyancy + this->dataPtr->netBuoyancyCmd) /
+          (this->dataPtr->airDensity * gravity.Length());
     }
   }
 
@@ -456,8 +488,11 @@ void AirshipDynamics::PreUpdate(
   // === 1.5 Four-Ballast Mass Weight (四气囊统一浮力调节) ===
   // 4气囊完全同步充放气, 总空气质量作为可变载荷
   // 充气(增重) -> 下沉; 放气(减重) -> 上升
-  // 气囊重量方向向下(world: +gravity), 与浮力(向上)相反
-  // 叠加到 buoyancyBody, 等效减小有效浮力
+  // P3c修改: 气囊质量动态计入 base_link Inertial 组件(见下方),
+  // 由Gazebo物理引擎自动施加气囊重力(作用在质心, 不产生倾斜力矩).
+  // 原V2实现手动施加 ballastWeightBody, 但Inertial质量不随气囊变化,
+  // 导致加速度响应偏差(气囊最大514kg, 占2206kg的23%).
+  // 现在改为动态惯量, 移除手动施力(避免双重计重).
   double totalBallastMass = 0.0;
   {
     std::lock_guard<std::mutex> lock(this->dataPtr->mtx);
@@ -465,9 +500,46 @@ void AirshipDynamics::PreUpdate(
       totalBallastMass += this->dataPtr->ballastMass[i];
     }
   }
-  math::Vector3d ballastWeightWorld = totalBallastMass * gravity;  // 向下
-  math::Vector3d ballastWeightBody = pose->Rot().RotateVectorReverse(ballastWeightWorld);
-  buoyancyBody += ballastWeightBody;
+
+  // === P3c: 气囊质量计入 base_link 惯量 (动态更新) ===
+  // 气囊作为质点载荷分布在左右两侧(Y方向), 用平行轴定理计算惯量增量:
+  //   四囊中心Y坐标(FLU, 相对base_link原点): LI=+3.3, LO=+8.6, RI=-3.3, RO=-8.6
+  //   Ixx/Izz += sum(m_i * y_i^2)  (气囊X/Z偏移约0, 忽略微小贡献)
+  //   Iyy 无贡献 (质点在Y轴上, dx=dz约0)
+  // 质量计入Inertial后, Gazebo自动施加气囊重力(作用在base_link质心),
+  // 与V2"气囊重量作用在CoM"等效且更精确.
+  // 用 lastSetMass 阈值控制更新频率(0.2kg), 避免每帧SetComponentData.
+  double newMass = this->dataPtr->baseMass + totalBallastMass;
+  if (std::abs(newMass - this->dataPtr->lastSetMass) > 0.2) {
+    const double ballastY[4] = {3.3, 8.6, -3.3, -8.6};
+    double ballastIxx = 0.0;
+    double ballastIzz = 0.0;
+    {
+      std::lock_guard<std::mutex> lock(this->dataPtr->mtx);
+      for (int i = 0; i < 4; i++) {
+        double y2 = ballastY[i] * ballastY[i];
+        ballastIxx += this->dataPtr->ballastMass[i] * y2;
+        ballastIzz += this->dataPtr->ballastMass[i] * y2;
+      }
+    }
+
+    auto inertialComp = _ecm.Component<components::Inertial>(this->dataPtr->linkEntity);
+    if (inertialComp) {
+      gz::math::Inertiald inertial = inertialComp->Data();
+      gz::math::MassMatrix3d mm = inertial.MassMatrix();
+      mm.SetMass(newMass);
+      mm.SetIxx(this->dataPtr->baseIxx + ballastIxx);
+      mm.SetIyy(this->dataPtr->baseIyy);
+      mm.SetIzz(this->dataPtr->baseIzz + ballastIzz);
+      inertial.SetMassMatrix(mm);
+      _ecm.SetComponentData<components::Inertial>(this->dataPtr->linkEntity, inertial);
+      this->dataPtr->lastSetMass = newMass;
+      gzmsg << "[AirshipDynamics] dynamic inertial: m=" << newMass
+            << " ixx=" << (this->dataPtr->baseIxx + ballastIxx)
+            << " iyy=" << this->dataPtr->baseIyy
+            << " izz=" << (this->dataPtr->baseIzz + ballastIzz) << std::endl;
+    }
+  }
 
   // === 2. Added Mass Forces and Moments ===
   // Using Kirchhoff equations
@@ -513,17 +585,18 @@ void AirshipDynamics::PreUpdate(
   math::Vector3d momentVisc = momentViscMag * math::Vector3d(0, viscNZ, -viscNY);
 
   // === 4. Axial Drag ===
+  // V2修复: 原实现只沿X轴(cos^2(AoA)仅保留轴向分量), 垂直方向(Z)完全无阻力,
+  // 导致飞艇垂直速度无约束(实测无推力也能高速上升, 快速运动失控).
+  // 改为沿速度反方向三轴分解, 垂直运动同样受阻力.
   math::Vector3d airspeedLin = linVel - windBody;
   double q0 = DynamicPressure(airspeedLin);
-  double angleOfAttack = 0.0;
-  if (std::abs(airspeedLin.X()) > 1e-4)
-  {
-    angleOfAttack = std::atan2(airspeedLin.Z(), airspeedLin.X());
+  double dragMag = q0 * this->dataPtr->axialDragCoeff;
+  double airspeedMag = airspeedLin.Length();
+  math::Vector3d forceAxialDrag(0, 0, 0);
+
+  if (airspeedMag > 1e-6) {
+    forceAxialDrag = -dragMag * airspeedLin / airspeedMag;
   }
-  math::Vector3d forceAxialDrag(
-      -q0 * this->dataPtr->axialDragCoeff *
-          std::cos(angleOfAttack) * std::cos(angleOfAttack),
-      0, 0);
 
   // === 5. Tether Force ===
   math::Vector3d tetherForceWorld{0, 0, 0};
@@ -556,8 +629,11 @@ void AirshipDynamics::PreUpdate(
   //   即: 补偿力矩 = P x F, 其中P是力的作用点(相对link原点)
 
   // 非浮力: 在CoM施加, 补偿力矩 = comOffset x F
+  // P3c修改: 气囊重量不再手动施加(见第1.5节), 由Gazebo通过动态Inertial质量
+  // 自动施加重力(作用在base_link质心, 相对CoM力矩为0, 只贡献纯垂直力,
+  // 不产生倾斜力矩, 不削弱摆锤被动稳定). 此处移除ballastWeightBody避免双重计重.
   math::Vector3d nonBuoyancyForce = addedMassForce + forceVisc + forceAxialDrag
-                                     + pose->Rot().RotateVectorReverse(tetherForceWorld);
+                                    + pose->Rot().RotateVectorReverse(tetherForceWorld);
   math::Vector3d nonBuoyancyMoment = addedMassMoment + momentVisc + rotDampingMoment;
 
   // 浮力: 在buoyancyCenter施加, 产生恢复力矩
@@ -575,6 +651,22 @@ void AirshipDynamics::PreUpdate(
   math::Vector3d totalForceBody = buoyancyBody + nonBuoyancyForce;
   math::Vector3d totalMomentBody = nonBuoyancyMoment + buoyancyCompensatingMoment
                                    + nonBuoyancyCompensatingMoment;
+
+  // TEMP-DEBUG: 打印各分力+真实位置 (诊断: 飞艇快速运动/净浮力/垂直阻力, 验证后删除)
+  static int ad_dbg_cnt = 0;
+
+  if (++ad_dbg_cnt % 10 == 1) {
+    static FILE *adf = fopen("/tmp/adsim_dbg.log", "a");
+    if (adf) {
+      fprintf(adf,
+          "pos_z=%.2f buoy=%.2f ballast_kg=%.2f amf=%.2f viscF=%.2f axial=%.2f"
+          " totalF=%.2f vz=%.2f vx=%.2f vy=%.2f\n",
+          pose->Z(), buoyancyBody.Z(), totalBallastMass, addedMassForce.Z(),
+          forceVisc.Z(), forceAxialDrag.Z(), totalForceBody.Z(),
+          linVel.Z(), linVel.X(), linVel.Y());
+      fflush(adf);
+    }
+  }
 
   baseLink.AddWorldWrench(_ecm,
       pose->Rot() * totalForceBody,

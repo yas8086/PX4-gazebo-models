@@ -957,7 +957,10 @@
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
       <motorConstant>1.608e-03</motorConstant>
-      <momentConstant>0.002</momentConstant>
+      <!-- V2修复: 反扭矩系数0.002->8e-5. 反扭矩/推力等效力臂=momentConstant/motorConstant
+           =1.24m, 真实螺旋桨约0.05m(过大25倍). 差动控制时泄漏伪偏航力矩~300N·m,
+           加剧姿态轴间耦合振荡 -->
+      <momentConstant>8e-5</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>0</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -974,7 +977,10 @@
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
       <motorConstant>1.608e-03</motorConstant>
-      <momentConstant>0.002</momentConstant>
+      <!-- V2修复: 反扭矩系数0.002->8e-5. 反扭矩/推力等效力臂=momentConstant/motorConstant
+           =1.24m, 真实螺旋桨约0.05m(过大25倍). 差动控制时泄漏伪偏航力矩~300N·m,
+           加剧姿态轴间耦合振荡 -->
+      <momentConstant>8e-5</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>1</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -991,7 +997,10 @@
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
       <motorConstant>1.608e-03</motorConstant>
-      <momentConstant>0.002</momentConstant>
+      <!-- V2修复: 反扭矩系数0.002->8e-5. 反扭矩/推力等效力臂=momentConstant/motorConstant
+           =1.24m, 真实螺旋桨约0.05m(过大25倍). 差动控制时泄漏伪偏航力矩~300N·m,
+           加剧姿态轴间耦合振荡 -->
+      <momentConstant>8e-5</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>2</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1008,7 +1017,10 @@
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
       <motorConstant>1.608e-03</motorConstant>
-      <momentConstant>0.002</momentConstant>
+      <!-- V2修复: 反扭矩系数0.002->8e-5. 反扭矩/推力等效力臂=momentConstant/motorConstant
+           =1.24m, 真实螺旋桨约0.05m(过大25倍). 差动控制时泄漏伪偏航力矩~300N·m,
+           加剧姿态轴间耦合振荡 -->
+      <momentConstant>8e-5</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>3</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1028,7 +1040,10 @@
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
       <motorConstant>-1.608e-03</motorConstant>
-      <momentConstant>0.002</momentConstant>
+      <!-- V2修复: 反扭矩系数0.002->8e-5. 反扭矩/推力等效力臂=momentConstant/motorConstant
+           =1.24m, 真实螺旋桨约0.05m(过大25倍). 差动控制时泄漏伪偏航力矩~300N·m,
+           加剧姿态轴间耦合振荡 -->
+      <momentConstant>8e-5</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>4</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1045,7 +1060,10 @@
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
       <motorConstant>-1.608e-03</motorConstant>
-      <momentConstant>0.002</momentConstant>
+      <!-- V2修复: 反扭矩系数0.002->8e-5. 反扭矩/推力等效力臂=momentConstant/motorConstant
+           =1.24m, 真实螺旋桨约0.05m(过大25倍). 差动控制时泄漏伪偏航力矩~300N·m,
+           加剧姿态轴间耦合振荡 -->
+      <momentConstant>8e-5</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>5</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1066,7 +1084,9 @@
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
       <motorConstant>8.677e-03</motorConstant>
-      <momentConstant>0.02</momentConstant>
+      <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
+           推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
+      <momentConstant>4.3e-4</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>6</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1083,7 +1103,9 @@
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
       <motorConstant>8.677e-03</motorConstant>
-      <momentConstant>0.02</momentConstant>
+      <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
+           推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
+      <momentConstant>4.3e-4</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>7</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1100,7 +1122,9 @@
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
       <motorConstant>8.677e-03</motorConstant>
-      <momentConstant>0.02</momentConstant>
+      <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
+           推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
+      <momentConstant>4.3e-4</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>8</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1117,7 +1141,9 @@
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
       <motorConstant>8.677e-03</motorConstant>
-      <momentConstant>0.02</momentConstant>
+      <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
+           推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
+      <momentConstant>4.3e-4</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>9</motorNumber>
       <rotorDragCoefficient>8.06428e-03</rotorDragCoefficient>
@@ -1133,15 +1159,21 @@
       <link_name>base_link</link_name>
       <air_density>1.225</air_density>
       <hull_volume>1800.0</hull_volume>
-      <net_buoyancy>0</net_buoyancy>
+      <!-- V2修复: net_buoyancy 0->+10N, 补偿实测微负净浮力(-9.8N, 浮力21609 vs 重力21618.8),
+           回到中性浮力; 该静态值作为基准与 ballast_cmd 动态调节量叠加(AirshipDynamics) -->
+      <net_buoyancy>10</net_buoyancy>
+      <!-- V2定稿: buoyancy_center上移至重心上方0.5m(0,0,-1.0), 形成摆锤被动稳定
+           (重心=浮力中心时横滚/俯仰中性不稳定, 控制两难: 漂移或耦合振荡) -->
       <buoyancy_offset>0 0 -1.5</buoyancy_offset>
-      <buoyancy_center>0 0 -1.5</buoyancy_center>
+      <buoyancy_center>0 0 -1.0</buoyancy_center>
       <force_inviscid_coeff>5.0</force_inviscid_coeff>
       <force_viscous_coeff>270.0</force_viscous_coeff>
       <moment_inviscid_coeff>400.0</moment_inviscid_coeff>
       <moment_viscous_coeff>200.0</moment_viscous_coeff>
       <eps_v>0.5</eps_v>
-      <axial_drag_coeff>3.0</axial_drag_coeff>
+      <!-- V2修复: 轴向阻力系数3.0->30, 配合三轴分解(AirshipDynamics),
+           垂直运动也受阻力约束, 防止飞艇垂直/水平速度失控快速运动 -->
+      <axial_drag_coeff>30.0</axial_drag_coeff>
       <dist_cov>0.0</dist_cov>
       <tether_stiffness>0</tether_stiffness>
       <tether_damping>0</tether_damping>
@@ -1153,9 +1185,10 @@
       <m55>5000</m55>
       <m66>5000</m66>
       <!-- 旋转阻尼系数 (N·m·s/rad) - 基于等效椭球体模型计算 -->
+      <!-- V2调参: rot_damping_z 140000->30000 (Position模式转向极慢0.125°/s, 降低后0.44°/s) -->
       <rot_damping_x>45000</rot_damping_x>
       <rot_damping_y>220000</rot_damping_y>
-      <rot_damping_z>140000</rot_damping_z>
+      <rot_damping_z>30000</rot_damping_z>
       <!-- 四气囊参数 (统一浮力调节, 4囊同步) -->
       <ballast_mass_max>128.5</ballast_mass_max>
     </plugin>
