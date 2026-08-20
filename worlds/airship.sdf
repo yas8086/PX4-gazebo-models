@@ -16,7 +16,7 @@
 
     <scene>
       <grid>false</grid>
-      <ambient>0.4 0.4 0.4 1</ambient>
+      <ambient>0.75 0.75 0.75 1</ambient>
       <background>0.7 0.7 0.7 1</background>
       <shadows>true</shadows>
     </scene>

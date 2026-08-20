@@ -2,9 +2,13 @@
 <sdf version="1.10">
   <world name="default">
     <physics type="ode">
-      <max_step_size>0.004</max_step_size>
+      <!-- 实验: max_step_size 0.004->0.001 (ODE数值稳定性, 飞艇大惯量+强推力+大附加质量
+           下4ms步长可能数值不稳定导致姿态振荡) -->
+      <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
-      <real_time_update_rate>250</real_time_update_rate>
+      <!-- P3收尾: RTF上限从0.25提升到1.0 (250->1000), 提升仿真实时性
+           max_step_size=0.001 下 250Hz = 4x慢动作, 1000Hz = 实时 -->
+      <real_time_update_rate>1000</real_time_update_rate>
     </physics>
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>1.36e-06 2.16e-05 -4.33e-05</magnetic_field>
