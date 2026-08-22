@@ -73,8 +73,11 @@
           <!-- V1版本奶白色材质: 偏蓝一点点的奶白 (R0.93 G0.93 B0.95) -->
           <!-- 修复: ambient alpha 从0.92改为1.0, 消除半透明渲染导致的   -->
           <!-- 左右渲染不一致(半透明深度排序问题会让一侧露出内部物体)   -->
+          <!-- 修复2: double_sided=true 双面渲染, 消除双层壳STL中法线朝内 -->
+          <!-- 面被背面剔除导致的"看穿到内层"(左侧透明发灰现象)         -->
           <ambient>0.93 0.93 0.95 1.0</ambient>
           <diffuse>0.93 0.93 0.95 1.0</diffuse>
+          <double_sided>true</double_sided>
         </material>
       </visual>
 
@@ -188,10 +191,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_0_collision'>
@@ -241,10 +247,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_1_collision'>
@@ -294,10 +303,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_2_collision'>
@@ -347,10 +359,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_3_collision'>
@@ -408,10 +423,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_4_collision'>
@@ -461,10 +479,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_5_collision'>
@@ -527,10 +548,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_6_collision'>
@@ -580,10 +604,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_7_collision'>
@@ -633,10 +660,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_8_collision'>
@@ -686,10 +716,13 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <name>Gazebo/DarkGrey</name>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-          </script>
+          <!-- 螺旋桨: 纯黑不透明 + 双面渲染 -->
+          <!-- 双面渲染修复薄壳结构只有边线黑的问题 (背面被剔除看不到主体) -->
+          <!-- ambient/diffuse 从0.05调到0.02, 视觉上是纯黑而不是发灰的深灰 -->
+          <ambient>0.02 0.02 0.02 1.0</ambient>
+          <diffuse>0.02 0.02 0.02 1.0</diffuse>
+          <specular>0.2 0.2 0.2 1.0</specular>
+          <double_sided>true</double_sided>
         </material>
       </visual>
       <collision name='rotor_9_collision'>

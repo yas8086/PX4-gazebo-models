@@ -85,11 +85,15 @@ FLU_Z =  SW_Z / 1000        (上为正)
 - **原始文件**: `../总体无螺旋桨.STL`（SW毫米，经转换生成）
 - **模型坐标范围**: X[-16.772, +16.772], Y[-11.251, +11.251], Z[-3.658, +3.658]
 - **尺寸**: 33.543 × 22.503 × 7.315 m
-- **三角形数**: 404,080
+- **三角形数**: 314,750（修复后；见下方网格修复说明）
 - **用途**:
   - [model.sdf#L69](`file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/model.sdf#L69`) `hull_visual`（外观，奶白色材质）
   - [model.sdf#L84](`file:///home/hex/PX4-Autopilot/Tools/simulation/gz/models/lingyun01/model.sdf#L84`) `hull_collision`（碰撞体）
-- **说明**: 4 个椭球气囊拼接的整体外形（长轴沿 X、短轴沿 Y），含尾椎与吊舱结构。法线已验证 100% 归一化、左右完全对称。
+- **网格修复说明**（解决"左右/主副囊透明不一致"问题）:
+  - **根因**: SW导出装配体STL时相交曲面独立三角化、交线顶点不焊接，产生61个连通碎片、27,909个几何重合重复面、大量0.1~1mm微缝。缝隙背后的物体（天空/结构）透出 → 副囊在两侧背后是天空显得"透明"，主囊在中间背后是吊舱显得"不透明"。与坐标转换（平移旋转）无关（拓扑指标已实证一致）。
+  - **修复**: ①1mm容差顶点焊接（1,212,240→155,532顶点）堵缝隙；②删除几何重合重复面27,909个；③剔除焊接后退化零面积面61,421个；④法线保留SW原始值不动。
+  - **修复验证**: 缝隙边界边仅3条（近乎水密）、重复面0、渲染无透明。
+  - **备份**: 原始未修复版本在 `hull_all.STL.bak`。
 
 ### 4.2 上升电机螺旋桨（4 个，推力沿 +Z 向上）
 
@@ -137,10 +141,10 @@ FLU_Z =  SW_Z / 1000        (上为正)
 
 | 文件 | 材质 | 颜色 | 备注 |
 |------|------|------|------|
-| hull_all.STL | ambient 0.93 0.93 0.95 1.0 + diffuse 0.93 0.93 0.95 1.0 | 奶白色 | **不透明**（alpha=1.0，修复过半透明问题） |
-| lift_up_*.STL | Gazebo/DarkGrey | 深灰 | 螺旋桨 |
-| lift_dn_*.STL | Gazebo/DarkGrey | 深灰 | 螺旋桨 |
-| thrust_*.STL | Gazebo/DarkGrey | 深灰 | 螺旋桨 |
+| hull_all.STL | ambient/diffuse 0.93 0.93 0.95 1.0 + double_sided=true | 奶白色 | **不透明**（alpha=1.0）；STL修复后法线100%朝外+去重，左右颜色完全一致；double_sided兜底确保薄壳边角处正确显示 |
+| lift_up_*.STL | ambient/diffuse 0.02 0.02 0.02 1.0 + specular 0.2 + double_sided=true | 纯黑不透明 | 螺旋桨；纯黑（原0.05发灰→改0.02）+双面渲染 修复薄壳只有边线黑主体灰问题 |
+| lift_dn_*.STL | ambient/diffuse 0.02 0.02 0.02 1.0 + specular 0.2 + double_sided=true | 纯黑不透明 | 螺旋桨；同上 |
+| thrust_*.STL | ambient/diffuse 0.02 0.02 0.02 1.0 + specular 0.2 + double_sided=true | 纯黑不透明 | 螺旋桨；同上 |
 
 > 注：风机/阀门为 model.sdf 内建的绿色圆柱 / 黄色圆盘（可视化占位），不在本文件夹。
 
@@ -230,7 +234,7 @@ python3 convert_stl_to_flu.py V2_source_SW/ V2_FLU/
 
 1. **坐标系**: 本文件夹全部为 FLU（X前/Y左/Z上）、米、中心在原点；PX4 控制分配使用 FRD（X前/Y右/Z下）时需另行转换。
 2. **中心定义**: 所有文件中心 = 艇身包围盒中心，**不是重心（CG）**。当前 model.sdf 重心定义为 `(0, 0, -1.5)`（艇身中心下方 1.5m）。
-3. **材质**: hull 材质为奶白色（ambient/diffuse alpha=1.0，不透明）；螺旋桨为 `Gazebo/DarkGrey`。
+3. **材质**: hull 材质为奶白色（ambient/diffuse alpha=1.0，不透明，double_sided=true 双面渲染兜底）；**STL已修复网格缝隙（顶点焊接+去重），四囊颜色一致无透明**；螺旋桨为纯黑不透明（ambient/diffuse 0.02，specular 0.2，double_sided=true 修复薄壳只有边线黑问题）。
 4. **螺旋桨类型**: 所有螺旋桨 STL 均为**静止桨叶形态**（非旋转圆盘），Gazebo 的 rotor 插件会驱动 link 旋转，显示为旋转效果。
 5. **风机/阀门占位**: 风机阀门为 model.sdf 内建的圆柱/圆盘（非本文件夹文件），仅作可视化，无独立 STL。
 6. **文件版本**: 这些文件对应 V2 固件配置（airframe 2058_gz_lingyun01），与 V1 不兼容。
