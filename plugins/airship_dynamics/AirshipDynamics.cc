@@ -624,6 +624,11 @@ void AirshipDynamics::PreUpdate(
   // 新方案: 四气囊取消横滚调节, 全部同步充放气用于调节高度
   // 横滚不通过气囊控制 (见 AirshipDynamics 上方 1.5 节: 气囊总质量 -> 垂直浮力)
 
+  // === 6.7 推进电机推力 (V2最终方案: 已移除) ===
+  // 推进电机M6-M9推力走MulticopterMotorModel插件standard_vtol标准路径
+  // (link旋转+joint反向补偿, 插件motorConstant=8.677e-03),
+  // 本插件不代算推进推力.
+
   // === 7. Total Forces and Moments ===
   // 策略:
   //   - 浮力在浮力中心(buoyancyCenter)施加, 产生恢复力矩(摆锤效应)
@@ -651,7 +656,7 @@ void AirshipDynamics::PreUpdate(
   math::Vector3d comOffset = this->dataPtr->buoyancyOffset;
   math::Vector3d nonBuoyancyCompensatingMoment = comOffset.Cross(nonBuoyancyForce);
 
-  // 总力和总力矩
+  // 总力和总力矩 (推进推力走MulticopterMotorModel插件, 此处不包含)
   math::Vector3d totalForceBody = buoyancyBody + nonBuoyancyForce;
   math::Vector3d totalMomentBody = nonBuoyancyMoment + buoyancyCompensatingMoment
                                    + nonBuoyancyCompensatingMoment;

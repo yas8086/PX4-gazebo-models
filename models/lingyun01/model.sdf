@@ -2,8 +2,6 @@
 <sdf version='1.10'>
   <model name='lingyun01'>
 
-    <pose>0 0 0 0 0 0</pose>
-
     <!-- ============================================================ -->
     <!-- 灵云01号 (Lingyun01) V2 - Gazebo Sim 仿真模型               -->
     <!--                                                              -->
@@ -35,6 +33,14 @@
 
     <static>false</static>
     <self_collide>false</self_collide>
+
+    <!-- V2修复: spawn高度 = 支架底(3.658) + 0.05m间隙.
+         原pose z=0时支架底(z=-3.658)初始穿透地面3.66m, ODE接触求解器
+         暴力弹射校正, 是贴地状态数值不稳定(起飞阶段剧烈摆动失控)的根源之一.
+         现让支架底恰好离地0.05m, spawn时无初始穿透, 静置落下即可稳定触地.
+         注意: 实际spawn位置由airframe 2058_gz_lingyun01的
+         PX4_GZ_MODEL_POSE(0,0,3.74)覆盖, 此pose仅为无外部spawn时的缺省值. -->
+    <pose>0 0 3.71 0 0 0</pose>
 
     <!-- ==================== -->
     <!-- 飞艇主体Link -->
@@ -81,25 +87,81 @@
         </material>
       </visual>
 
-      <!-- ====== 碰撞体 (mesh精确外形) ====== -->
-      <collision name='hull_collision'>
-        <pose>0 0 0 0 0 0</pose>
-        <geometry>
-          <mesh>
-            <uri>model://lingyun01/meshes/V2_FLU/hull_all.STL</uri>
-          </mesh>
-        </geometry>
-        <surface>
-          <contact>
-            <ode>
-              <min_depth>0.05</min_depth>
-              <max_vel>0</max_vel>
-            </ode>
-          </contact>
-          <friction>
-            <ode/>
-          </friction>
-        </surface>
+      <!-- ====== 碰撞体 (V2修复: 基本形状近似, 替代40万三角mesh) ====== -->
+      <!-- 原mesh碰撞体(hull_all.STL 40万三角形)与地面plane做trimesh接触时,
+           ODE求解器在三角形法线细微差异间震荡, 推进电机启动扰动即触发
+           法向力数值发散(弹射+随机姿态冲击), 即"起飞阶段剧烈摆动失控"根因.
+           现按STL实测几何位置用sphere/capsule近似(视觉mesh不变):
+             第一接触: 4 x 降落支架sphere (全艇最低点 z=-3.658, 两副囊下方,
+                       前后各一, 用户确认的实体结构)
+             二级保护: 4 x 推进短舱sphere (z底-3.26~-3.51)
+                       2 x 副囊capsule + 2 x 主囊capsule (侧倾兜底)
+                       1 x 尾部sphere (z底-3.29, 大俯仰保护)
+           sphere/capsule vs plane是ODE最稳定接触组合, 彻底根治接触爆炸. -->
+
+      <!-- 4 x 降落支架 (第一接触点, 支架底z=-3.658, sphere中心抬高r) -->
+      <collision name='gear_lf_collision'>
+        <pose>5.06 8.96 -3.458 0 0 0</pose>
+        <geometry><sphere><radius>0.2</radius></sphere></geometry>
+      </collision>
+      <collision name='gear_lb_collision'>
+        <pose>-4.94 8.44 -3.458 0 0 0</pose>
+        <geometry><sphere><radius>0.2</radius></sphere></geometry>
+      </collision>
+      <collision name='gear_rf_collision'>
+        <pose>5.06 -8.96 -3.458 0 0 0</pose>
+        <geometry><sphere><radius>0.2</radius></sphere></geometry>
+      </collision>
+      <collision name='gear_rb_collision'>
+        <pose>-4.94 -8.44 -3.458 0 0 0</pose>
+        <geometry><sphere><radius>0.2</radius></sphere></geometry>
+      </collision>
+
+      <!-- 4 x 推进电机短舱 (z底实测-3.51后/-3.26前, 比支架高) -->
+      <collision name='nacelle_lf_collision'>
+        <pose>2.19 5.86 -2.9 0 0 0</pose>
+        <geometry><sphere><radius>0.4</radius></sphere></geometry>
+      </collision>
+      <collision name='nacelle_lb_collision'>
+        <pose>-2.93 5.8 -3.1 0 0 0</pose>
+        <geometry><sphere><radius>0.4</radius></sphere></geometry>
+      </collision>
+      <collision name='nacelle_rf_collision'>
+        <pose>2.19 -5.86 -2.9 0 0 0</pose>
+        <geometry><sphere><radius>0.4</radius></sphere></geometry>
+      </collision>
+      <collision name='nacelle_rb_collision'>
+        <pose>-2.93 -5.8 -3.1 0 0 0</pose>
+        <geometry><sphere><radius>0.4</radius></sphere></geometry>
+      </collision>
+
+      <!-- 2 x 副囊capsule (Y=±8.6, 沿X轴, STL: X±14, Z-3.66~+1.86) -->
+      <!-- capsule默认沿Z轴, pose绕Y转90度转为沿X轴. 中心z=-0.6, r=2.6, 长13
+           -> 最低点z=-3.2 (高于支架底0.46m, 侧倾时才接触) -->
+      <collision name='balloon_LO_collision'>
+        <pose>0 8.6 -0.6 0 1.5708 0</pose>
+        <geometry><capsule><radius>2.6</radius><length>13</length></capsule></geometry>
+      </collision>
+      <collision name='balloon_RO_collision'>
+        <pose>0 -8.6 -0.6 0 1.5708 0</pose>
+        <geometry><capsule><radius>2.6</radius><length>13</length></capsule></geometry>
+      </collision>
+
+      <!-- 2 x 主囊capsule (Y=±3.3, 沿X轴, STL: X±16.8, Z-3.5~+3.66) -->
+      <!-- 中心z=0.2, r=3.2, 长15 -> 最低点z=-3.0 (高于副囊, 最后兜底) -->
+      <collision name='balloon_LI_collision'>
+        <pose>0 3.3 0.2 0 1.5708 0</pose>
+        <geometry><capsule><radius>3.2</radius><length>15</length></capsule></geometry>
+      </collision>
+      <collision name='balloon_RI_collision'>
+        <pose>0 -3.3 0.2 0 1.5708 0</pose>
+        <geometry><capsule><radius>3.2</radius><length>15</length></capsule></geometry>
+      </collision>
+
+      <!-- 尾部整流罩 (STL实测z底-3.29, X=-15.06) -->
+      <collision name='tail_collision'>
+        <pose>-15.05 0 -2.9 0 0 0</pose>
+        <geometry><sphere><radius>0.4</radius></sphere></geometry>
       </collision>
 
       <!-- ====== 重心可视化 (红色球体) ====== -->
@@ -175,11 +237,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_0_visual'>
@@ -231,11 +293,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_1_visual'>
@@ -287,11 +349,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_2_visual'>
@@ -343,11 +405,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_3_visual'>
@@ -407,11 +469,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_4_visual'>
@@ -463,11 +525,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_5_visual'>
@@ -517,26 +579,40 @@
     <!-- 推进电机 (rotor_6~9, 输出6-9) - 水平推进+差动偏航                -->
     <!--   rotor_6 推进左前 (FLU: 2.230, 5.888, -2.378)   CW              -->
     <!--   rotor_7 推进右前 (FLU: 2.230, -5.887, -2.378)  CCW            -->
-    <!--   rotor_8 推进左后 (FLU: -2.971, 5.888, -2.378)  CW             -->
-    <!--   rotor_9 推进右后 (FLU: -2.972, -5.887, -2.378) CCW           -->
+    <!--   rotor_8 推进左后 (FLU: -2.971, 5.888, -2.378)  CCW            -->
+    <!--   rotor_9 推进右后 (FLU: -2.972, -5.887, -2.378) CW             -->
     <!--                                                              -->
-    <!-- 推力方向: link pose绕Y轴+90度, 使局部Z轴指向FLU +X (向前)     -->
-    <!-- 旋转轴: joint axis=(0,0,1) (局部Z=FLU X, 绕前后轴旋转)       -->
-    <!-- visual/collision pose = R_y(-90) 补偿link旋转                -->
-    <!--   t_V = -R_y(-90) * t_L, R_V = R_y(-90)                      -->
+    <!-- V2修复(同杆对转): 同侧前后对转抵消反扭矩                       -->
+    <!--   左杆 M6(cw)+M8(ccw), 右杆 M7(ccw)+M9(cw)                    -->
+    <!--   差动偏航时同杆cw/ccw反扭矩等量反向, 净滚转反扭矩恒为0        -->
+    <!--   (旧"左右对转"方案差动时泄漏伪横滚力矩~800N·m)               -->
+    <!--                                                              -->
+    <!-- V2修复(standard_vtol标准方案): link旋转+joint反向补偿          -->
+    <!--   link pose绕Y轴+90度, 使局部Z轴指向FLU +X (向前, 推力方向)   -->
+    <!--   joint pose绕Y轴-90度反向补偿: joint坐标系 = R_y(+90)xR_y(-90)-->
+    <!--   = 单位阵, 即joint参考系与base_link完全对齐,                 -->
+    <!--   ODE约束求解在无旋转坐标系中进行, 数值稳定(官方VTOL同做法)    -->
+    <!--   joint axis=(1,0,0) 沿机体X(前后), 桨盘垂直于前进方向        -->
+    <!--   visual/collision pose = R_y(-90) 补偿link旋转               -->
+    <!--     t_V = -R_y(-90) * t_L, R_V = R_y(-90)                     -->
     <!-- ================================================================ -->
 
     <link name='rotor_6'>
+      <!-- V2修复: link绕Y轴+90度旋转(局部Z=机体X, 推力沿局部+Z即向前).
+           旧方案爆炸根因: 只做link旋转、漏了joint反向补偿pose,
+           joint坐标系相对parent带90度旋转 -> ODE约束求解病态.
+           现按standard_vtol标准方案: link旋转+joint的-90度补偿配合使用. -->
       <pose>2.230 5.888 -2.378 0 1.5708 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
+      <!-- V2最终方案: 轻量级转子link, 推力走standard_vtol插件joint传力路径 -->
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_6_visual'>
@@ -567,10 +643,13 @@
       </collision>
     </link>
     <joint name='rotor_6_joint' type='revolute'>
+      <!-- V2修复: joint pose绕Y轴-90度反向补偿link的+90度旋转,
+           joint坐标系与base_link对齐(官方standard_vtol同做法) -->
+      <pose>0 0 0 0 -1.5708 0</pose>
       <parent>base_link</parent>
       <child>rotor_6</child>
       <axis>
-        <xyz>0 0 1</xyz>
+        <xyz>1 0 0</xyz>
         <limit>
           <lower>-1e+16</lower>
           <upper>1e+16</upper>
@@ -583,16 +662,18 @@
     </joint>
 
     <link name='rotor_7'>
+      <!-- V2修复: link绕Y轴+90度旋转(同rotor_6, standard_vtol标准方案) -->
       <pose>2.230 -5.887 -2.378 0 1.5708 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
+      <!-- V2最终方案: 轻量级转子, 推力走插件joint传力路径 -->
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_7_visual'>
@@ -623,10 +704,12 @@
       </collision>
     </link>
     <joint name='rotor_7_joint' type='revolute'>
+      <!-- V2修复: -90度反向补偿(同rotor_6_joint) -->
+      <pose>0 0 0 0 -1.5708 0</pose>
       <parent>base_link</parent>
       <child>rotor_7</child>
       <axis>
-        <xyz>0 0 1</xyz>
+        <xyz>1 0 0</xyz>
         <limit>
           <lower>-1e+16</lower>
           <upper>1e+16</upper>
@@ -639,16 +722,18 @@
     </joint>
 
     <link name='rotor_8'>
+      <!-- V2修复: link绕Y轴+90度旋转(同rotor_6, standard_vtol标准方案) -->
       <pose>-2.971 5.888 -2.378 0 1.5708 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
+      <!-- V2最终方案: 轻量级转子, 推力走插件joint传力路径 -->
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_8_visual'>
@@ -679,10 +764,12 @@
       </collision>
     </link>
     <joint name='rotor_8_joint' type='revolute'>
+      <!-- V2修复: -90度反向补偿(同rotor_6_joint) -->
+      <pose>0 0 0 0 -1.5708 0</pose>
       <parent>base_link</parent>
       <child>rotor_8</child>
       <axis>
-        <xyz>0 0 1</xyz>
+        <xyz>1 0 0</xyz>
         <limit>
           <lower>-1e+16</lower>
           <upper>1e+16</upper>
@@ -695,16 +782,18 @@
     </joint>
 
     <link name='rotor_9'>
+      <!-- V2修复: link绕Y轴+90度旋转(同rotor_6, standard_vtol标准方案) -->
       <pose>-2.972 -5.887 -2.378 0 1.5708 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <velocity_decay/>
+      <!-- V2最终方案: 轻量级转子, 推力走插件joint传力路径 -->
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='rotor_9_visual'>
@@ -735,10 +824,12 @@
       </collision>
     </link>
     <joint name='rotor_9_joint' type='revolute'>
+      <!-- V2修复: -90度反向补偿(同rotor_6_joint) -->
+      <pose>0 0 0 0 -1.5708 0</pose>
       <parent>base_link</parent>
       <child>rotor_9</child>
       <axis>
-        <xyz>0 0 1</xyz>
+        <xyz>1 0 0</xyz>
         <limit>
           <lower>-1e+16</lower>
           <upper>1e+16</upper>
@@ -759,7 +850,7 @@
     <!-- 短轴半径: 主囊=3.1m, 副囊=2.5m(用户提供)                      -->
     <!-- STL实测(convert_stl_to_flu.py平移到中心): 主囊Y=±3.15, 副囊Y=±8.9 -->
     <!--                                                                      -->
-    <!--  FLU_Y+ (左) ---------- Y增大方向 -------> FLU_Y- (右)            -->
+    <!--  FLU_Y+ (左) - Y增大方向 > FLU_Y- (右)            -->
     <!--  [LO左外副囊]  [LI左内主囊]  [RI右内主囊]  [RO右外副囊]           -->
     <!--   Y=+8.6       Y=+3.3       Y=-3.3       Y=-8.6                  -->
     <!--   短轴R=2.5m    短轴R=3.1m    短轴R=3.1m    短轴R=2.5m            -->
@@ -780,11 +871,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='blower_main_left_visual'>
@@ -799,11 +890,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='valve_main_left_visual'>
@@ -821,11 +912,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='blower_main_right_visual'>
@@ -840,11 +931,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='valve_main_right_visual'>
@@ -862,11 +953,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='blower_aux_left_visual'>
@@ -881,11 +972,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='valve_aux_left_visual'>
@@ -903,11 +994,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='blower_aux_right_visual'>
@@ -922,11 +1013,11 @@
       <self_collide>false</self_collide>
       <velocity_decay/>
       <inertial>
-        <mass>1e-8</mass>
+        <mass>0.005</mass>
         <inertia>
-          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>0.0001</iyy><iyz>0</iyz>
-          <izz>0.0001</izz>
+          <ixx>9.75e-07</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.000273104</iyy><iyz>0</iyz>
+          <izz>0.000274004</izz>
         </inertia>
       </inertial>
       <visual name='valve_aux_right_visual'>
@@ -1108,7 +1199,8 @@
     <!-- 推进电机插件 (rotor_6~9): 水平推力向前 (link旋转后局部Z=FLU X) -->
     <!-- HOBBYWING P65M, 最大推力 1352.4N (138kg) -->
     <!-- motorConstant = 1352.4 / 394.8^2 = 8.677e-03 (占位, 待用户提供实际转速) -->
-    <!-- 旋转方向: 左侧CW, 右侧CCW (左右对转, 滚转反扭矩抵消) -->
+    <!-- V2修复(同杆对转): 左杆M6(cw)+M8(ccw), 右杆M7(ccw)+M9(cw) -->
+    <!--   同侧前后对转, 差动偏航时净滚转反扭矩恒为0 -->
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_6_joint</jointName>
       <linkName>rotor_6</linkName>
@@ -1116,6 +1208,13 @@
       <timeConstantUp>0.15</timeConstantUp>
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
+      <!-- V2最终方案(用户确认): 推进电机joint采用standard_vtol标准方案.
+           link旋转(+90)+joint反向补偿(-90)几何正确(浆盘垂直), 插件恢复正常
+           推力计算(motorConstant=8.677e-03), 推力经转子joint约束传至base_link.
+           判别实验证实: 30m空中此路径完全稳定(PASS 0.03m/s);
+           近地(地面接触)启动推进触发ODE数值发散(弹射), 是仿真数值伪影,
+           真实飞行起飞/降落只用升力电机, 推进仅空中激活, 天然规避该场景.
+           操作指引: 推进激励测试一律在起飞后(>=30m)进行, 贴地不做推进测试. -->
       <motorConstant>8.677e-03</motorConstant>
       <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
            推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
@@ -1135,6 +1234,7 @@
       <timeConstantUp>0.15</timeConstantUp>
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
+      <!-- V2最终方案: motorConstant恢复(同rotor_6, VTOL标准路径) -->
       <motorConstant>8.677e-03</motorConstant>
       <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
            推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
@@ -1150,10 +1250,13 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_8_joint</jointName>
       <linkName>rotor_8</linkName>
-      <turningDirection>cw</turningDirection>
+      <!-- V2修复(同杆对转): 左杆M6(cw)+M8(ccw),
+           同侧前后对转保证单侧推进时反扭矩自抵消 -->
+      <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.15</timeConstantUp>
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
+      <!-- V2最终方案: motorConstant恢复(同rotor_6, VTOL标准路径) -->
       <motorConstant>8.677e-03</motorConstant>
       <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
            推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
@@ -1169,10 +1272,12 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_9_joint</jointName>
       <linkName>rotor_9</linkName>
-      <turningDirection>ccw</turningDirection>
+      <!-- V2修复(同杆对转): 右杆M7(ccw)+M9(cw) -->
+      <turningDirection>cw</turningDirection>
       <timeConstantUp>0.15</timeConstantUp>
       <timeConstantDown>0.2</timeConstantDown>
       <maxRotVelocity>394.8</maxRotVelocity>
+      <!-- V2最终方案: motorConstant恢复(同rotor_6, VTOL标准路径) -->
       <motorConstant>8.677e-03</motorConstant>
       <!-- V2修复: 反扭矩系数0.02->4.3e-4. 原等效力臂2.3m(真实约0.05m,过大46倍).
            推进电机差动偏航时泄漏伪横滚力矩~800N·m, 加剧横滚振荡 -->
@@ -1186,7 +1291,9 @@
     </plugin>
 
     <!-- ==================== -->
-    <!-- 飞艇气动力插件       -->
+    <!-- 飞艇气动力插件 (浮力/附加质量/粘性阻力/旋转阻尼/气囊动态惯量) -->
+    <!-- V2最终方案: 推进推力走MulticopterMotorModel插件joint传力路径, -->
+    <!--             本插件不再包含推进电机推力逻辑 -->
     <!-- ==================== -->
     <plugin filename="/home/hex/PX4-Autopilot/Tools/simulation/gz/plugins/airship_dynamics/build/libAirshipDynamics.so" name="gz::sim::systems::AirshipDynamics">
       <link_name>base_link</link_name>
