@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/hex/PX4-Autopilot/Tools/simulation/gz/plugins/airship_dynamics/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

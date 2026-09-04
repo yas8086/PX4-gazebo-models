@@ -1,1 +1,7 @@
-sdf_parsing/build/
+# 构建产物 (不跟踪, 避免每次编译污染工作区状态)
+plugins/*/build/
+
+# 本地备份 (SolidWorks源/V1旧版/STL备份)
+*.bak
+models/lingyun01/meshes/V1/
+models/lingyun01/meshes/V2_source_SW/
