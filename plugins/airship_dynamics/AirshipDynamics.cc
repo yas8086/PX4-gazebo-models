@@ -89,7 +89,8 @@ public:
   bool netBuoyancyCmdValid{false};
 
   // 四气囊空气质量 (kg) - 索引(与 msg/bridge 契约一致):
-  //   0=左内主囊 LI(+3.3), 1=右内主囊 RI(-3.3), 2=左外副囊 LO(+8.6), 3=右外副囊 RO(-8.6)
+  //   0=囊1左副囊 LO(+8.6), 1=囊2左主囊 LI(+3.3), 2=囊3右主囊 RI(-3.3), 3=囊4右副囊 RO(-8.6)
+  // 左右以站在艇尾朝艇头看为准; 顺序与执行器囊1~4及传感器槽序一致
   // 由 PX4 ballast_control 积分估计并通过 ballast_actuator topic 发送
   // 4气囊完全同步充放气, 总质量作为可变载荷影响垂直浮力
   double ballastMass[4]{0.0, 0.0, 0.0, 0.0};
@@ -128,7 +129,7 @@ public:
   void UpdateBallastActuator(const msgs::Vector3d &_msg)
   {
     std::lock_guard<std::mutex> lock(this->mtx);
-    // x = 气囊索引 (0=左内主囊LI, 1=右内主囊RI, 2=左外副囊LO, 3=右外副囊RO)
+    // x = 气囊索引 (0=囊1左副囊LO, 1=囊2左主囊LI, 2=囊3右主囊RI, 3=囊4右副囊RO)
     // y = 执行器状态位图: bit0=blower(风机), bit1=valve(阀门)
     // z = 当前空气质量 (kg)
     int idx = static_cast<int>(_msg.x());
@@ -505,7 +506,7 @@ void AirshipDynamics::PreUpdate(
   // === P3c: 气囊质量计入 base_link 惯量 (动态更新) ===
   // 气囊作为质点载荷分布在左右两侧(Y方向), 用平行轴定理计算惯量增量:
   //   四囊中心Y坐标(FLU, 相对base_link原点), 索引与 msg/bridge 契约一致:
-  //   0=LI左主+3.3, 1=RI右主-3.3, 2=LO左副+8.6, 3=RO右副-8.6
+  //   0=囊1左副LO+8.6, 1=囊2左主LI+3.3, 2=囊3右主RI-3.3, 3=囊4右副RO-8.6
   //   Ixx/Izz += sum(m_i * y_i^2)  (气囊X/Z偏移约0, 忽略微小贡献)
   //   Iyy 无贡献 (质点在Y轴上, dx=dz约0)
   // 质量计入Inertial后, Gazebo自动施加气囊重力(作用在base_link质心),
@@ -513,9 +514,9 @@ void AirshipDynamics::PreUpdate(
   // 用 lastSetMass 阈值控制更新频率(0.2kg), 避免每帧SetComponentData.
   double newMass = this->dataPtr->baseMass + totalBallastMass;
   if (std::abs(newMass - this->dataPtr->lastSetMass) > 0.2) {
-    // 索引(与 msg/bridge 契约一致): 0=LI左主, 1=RI右主, 2=LO左副, 3=RO右副
+    // 索引(与 msg/bridge 契约一致): 0=囊1左副LO, 1=囊2左主LI, 2=囊3右主RI, 3=囊4右副RO
     // 说明: 四囊完全同步(质量相同), sum(m*y^2) 与索引顺序无关, 故此处重排对齐契约不改变物理行为
-    const double ballastY[4] = {3.3, -3.3, 8.6, -8.6};
+    const double ballastY[4] = {8.6, 3.3, -3.3, -8.6};
     double ballastIxx = 0.0;
     double ballastIzz = 0.0;
     {
