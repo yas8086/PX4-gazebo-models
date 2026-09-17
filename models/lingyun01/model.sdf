@@ -223,10 +223,11 @@
 
     <!-- ================================================================ -->
     <!-- 上升电机 (rotor_0~3, 输出0-3) - 推力向上, 四角布局               -->
-    <!--   rotor_0 上升左前 (FLU: 7.557, 6.338, -0.584)   CCW             -->
-    <!--   rotor_1 上升右前 (FLU: 7.557, -6.337, -0.584)  CW              -->
-    <!--   rotor_2 上升左后 (FLU: -9.843, 5.814, -0.584)  CW              -->
-    <!--   rotor_3 上升右后 (FLU: -9.843, -5.812, -0.584) CCW            -->
+    <!--   rotor_0 上升左前 (FLU: 7.557, 6.338, -0.584)   CW              -->
+    <!--   rotor_1 上升右前 (FLU: 7.557, -6.337, -0.584)  CCW            -->
+    <!--   rotor_2 上升左后 (FLU: -9.843, 5.814, -0.584)  CCW            -->
+    <!--   rotor_3 上升右后 (FLU: -9.843, -5.812, -0.584) CW             -->
+    <!--   [2026-09-10 实装转向修正] 4个上升电机全部反转, 对角配对M0(cw)+M3(cw)/M1(ccw)+M2(ccw)仍抵消反扭矩 -->
     <!--   推力沿局部+Z (FLU Z向上), joint axis=(0,0,1)                   -->
     <!--   motorConstant>0: 推力沿+Z (向上, 上升)                         -->
     <!-- ================================================================ -->
@@ -1076,7 +1077,7 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_0_joint</jointName>
       <linkName>rotor_0</linkName>
-      <turningDirection>ccw</turningDirection>
+      <turningDirection>cw</turningDirection>
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
@@ -1096,7 +1097,7 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_1_joint</jointName>
       <linkName>rotor_1</linkName>
-      <turningDirection>cw</turningDirection>
+      <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
@@ -1116,7 +1117,7 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_2_joint</jointName>
       <linkName>rotor_2</linkName>
-      <turningDirection>cw</turningDirection>
+      <turningDirection>ccw</turningDirection>
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
@@ -1136,7 +1137,7 @@
     <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
       <jointName>rotor_3_joint</jointName>
       <linkName>rotor_3</linkName>
-      <turningDirection>ccw</turningDirection>
+      <turningDirection>cw</turningDirection>
       <timeConstantUp>0.2</timeConstantUp>
       <timeConstantDown>0.3</timeConstantDown>
       <maxRotVelocity>372.0</maxRotVelocity>
